@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/aIIyou/workflow/config"
 )
 
 type Transition struct {
@@ -261,6 +264,9 @@ type EventFlow struct {
 	//transitions define how to flow from one event to another after it is executed.
 	transitions map[string][]Transition
 
+	//handler is the event flow handler.
+	handler any
+
 	mu *sync.RWMutex
 }
 
@@ -306,22 +312,151 @@ func (flow *EventFlow) AddEvents(events []string) *EventFlow {
 	return flow
 }
 
-func (flow *EventFlow) AddTransitions(transitions []Transition) *EventFlow {
+func (flow *EventFlow) AddTransitions(transitions []config.Transition) *EventFlow {
 	flow.mu.Lock()
 	defer flow.mu.Unlock()
 	if flow.transitions == nil {
 		flow.transitions = make(map[string][]Transition)
 	}
 	for _, tran := range transitions {
-		if _, existed := flow.transitions[tran.fromEvent]; !existed {
-			flow.transitions[tran.fromEvent] = make([]Transition, 0)
+		if _, existed := flow.transitions[tran.FromEvent]; !existed {
+			flow.transitions[tran.FromEvent] = make([]Transition, 0)
 		}
-		flow.transitions[tran.fromEvent] = append(flow.transitions[tran.fromEvent], tran)
+		flow.transitions[tran.FromEvent] = append(flow.transitions[tran.FromEvent], NewTransition(
+			tran.FromEvent,
+			tran.ToEvent,
+			tran.Expr,
+		))
 	}
-
 	return flow
 }
 
 func (flow *EventFlow) NextEvent(event *Event) string {
 	return ""
+}
+
+var (
+	globalWorkflow      map[string]*EventFlow
+	globalWorkflowMutex sync.RWMutex
+)
+
+// RegisterWorkflow register workflow
+func RegisterWorkflow(name string, handler any, conf *config.Configuration) error {
+	globalWorkflowMutex.Lock()
+	defer globalWorkflowMutex.Unlock()
+	if globalWorkflow == nil {
+		globalWorkflow = make(map[string]*EventFlow)
+	}
+	if _, existed := globalWorkflow[name]; existed {
+		return fmt.Errorf(`workflow "%s" already registered`, name)
+	}
+	if conf == nil {
+		conf = config.GetConfigure()
+	}
+	if conf == nil {
+		return fmt.Errorf("configure is nil")
+	}
+	for _, flowConfig := range conf.Flows {
+		if flowConfig.FlowName != name {
+			continue
+		}
+		if err := validateHandler(handler, flowConfig.EventsName); err != nil {
+			return err
+		}
+		flow := &EventFlow{
+			_type:   name,
+			name:    name,
+			events:  flowConfig.EventsName,
+			handler: handler,
+			mu:      &sync.RWMutex{},
+		}
+		flow.AddTransitions(flowConfig.Transitions)
+		globalWorkflow[name] = flow
+		return nil
+	}
+	return fmt.Errorf(`workflow "%s" not configured`, name)
+}
+
+func validateHandler(handler any, eventsName []string) error {
+	// Validate that handler is a struct or pointer to struct
+	val := reflect.ValueOf(handler)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	if val.Kind() != reflect.Struct {
+		return fmt.Errorf("handler must be a struct or pointer to struct, got %s", val.Kind())
+	}
+
+	// Convert eventsName to camel case with first letter capitalized
+	expectedMethods := make(map[string]bool)
+	for _, eventName := range eventsName {
+		methodName := toCamelCase(eventName)
+		expectedMethods[methodName] = true
+	}
+
+	// Get all methods of the handler
+	handlerType := reflect.TypeOf(handler)
+	for i := 0; i < handlerType.NumMethod(); i++ {
+		method := handlerType.Method(i)
+
+		// Only validate methods that are in the expected methods list
+		// Allow extra methods in the handler
+		if expectedMethods[method.Name] {
+			// Check method signature: parameter should be context.Context, return value should be error
+			if method.Type.NumIn() != 2 { // First parameter is receiver
+				return fmt.Errorf("method %s should have exactly 1 parameter (context.Context)", method.Name)
+			}
+
+			paramType := method.Type.In(1)
+			if paramType.String() != "context.Context" {
+				return fmt.Errorf("method %s parameter should be context.Context, got %s", method.Name, paramType)
+			}
+
+			if method.Type.NumOut() != 1 {
+				return fmt.Errorf("method %s should return exactly 1 value (error)", method.Name)
+			}
+
+			returnType := method.Type.Out(0)
+			if returnType.String() != "error" {
+				return fmt.Errorf("method %s should return error, got %s", method.Name, returnType)
+			}
+
+			// Remove found method from expected methods list
+			delete(expectedMethods, method.Name)
+		}
+	}
+
+	// Check if all expected methods exist
+	if len(expectedMethods) > 0 {
+		return fmt.Errorf("missing methods in handler: %v", getKeys(expectedMethods))
+	}
+
+	return nil
+}
+
+// toCamelCase 将字符串转换为大写开头的驼峰命名法
+func toCamelCase(s string) string {
+	if s == "" {
+		return s
+	}
+
+	//处理下划线分隔的命名
+	parts := strings.Split(s, "_")
+	for i, part := range parts {
+		if part == "" {
+			continue
+		}
+		parts[i] = strings.ToUpper(part[:1]) + strings.ToLower(part[1:])
+	}
+
+	return strings.Join(parts, "")
+}
+
+// getKeys 获取map的所有key
+func getKeys(m map[string]bool) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
