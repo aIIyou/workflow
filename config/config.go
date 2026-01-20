@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"sync"
 
 	"gopkg.in/yaml.v3"
 )
@@ -11,8 +12,9 @@ const (
 )
 
 var (
-	globalPath      string //global configure file path
-	globalConfigure Configuration
+	globalPath           string //global configure file path
+	globalConfigure      *Configuration
+	globalConfigureMutex sync.RWMutex
 )
 
 type transition struct {
@@ -38,6 +40,15 @@ func SetConfigPath(path string) {
 
 func GetConfigPath() string {
 	return globalPath
+}
+
+func GetConfigure() *Configuration {
+	globalConfigureMutex.Lock()
+	defer globalConfigureMutex.Unlock()
+	if globalConfigure == nil {
+		parseConfigFile()
+	}
+	return globalConfigure
 }
 
 func parseConfigFile() {
@@ -66,7 +77,9 @@ func parseConfigFile() {
 			panic(err)
 		}
 
-		if err := yaml.Unmarshal(workflowData, &globalConfigure); err != nil {
+		globalConfigure = new(Configuration)
+
+		if err := yaml.Unmarshal(workflowData, globalConfigure); err != nil {
 			panic(err)
 		}
 	}
