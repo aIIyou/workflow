@@ -3,7 +3,7 @@ package event_flow
 import "context"
 
 type Event struct {
-	Id int64
+	Id string
 
 	// Type is the event category determined by the user's business logic layer.
 	// Examples: "payment.processed", "user.registered", "order.shipped"
@@ -35,7 +35,7 @@ func NewEvent(eventType, name string, handler func(ctx context.Context)) *Event 
 }
 
 // SetId set event id
-func (e *Event) SetId(id int64) *Event {
+func (e *Event) SetId(id string) *Event {
 	e.Id = id
 	return e
 }
@@ -47,7 +47,7 @@ type StartEvent struct {
 
 var GlobalStartEvent = &StartEvent{
 	Event: Event{
-		Id:   0,
+		Id:   uuid.New().String(),
 		Type: "start",
 		Name: "global-start",
 		Handler: func(ctx context.Context) {
@@ -62,7 +62,7 @@ type EndEvent struct {
 
 var GlobalEndEvent = &EndEvent{
 	Event: Event{
-		Id:   0,
+		Id:   uuid.New().String(),
 		Type: "end",
 		Name: "global-end",
 		Handler: func(ctx context.Context) {
