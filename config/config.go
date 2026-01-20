@@ -17,7 +17,7 @@ var (
 	globalConfigureMutex sync.RWMutex
 )
 
-type transition struct {
+type Transition struct {
 	FromEvent string `yaml:"from_event"`
 	ToEvent   string `yaml:"to_event"`
 	Expr      string `yaml:"expr"`
@@ -31,7 +31,7 @@ type Configuration struct {
 type FlowConfig struct {
 	FlowName    string       `yaml:"flow_name"`
 	EventsName  []string     `yaml:"events_name"`
-	Transitions []transition `yaml:"transitions"`
+	Transitions []Transition `yaml:"transitions"`
 }
 
 func SetConfigPath(path string) {
