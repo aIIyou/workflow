@@ -12,7 +12,7 @@ const (
 
 var (
 	globalPath      string //global configure file path
-	globalConfigure map[string]configuration
+	globalConfigure Configuration
 )
 
 type transition struct {
@@ -21,7 +21,12 @@ type transition struct {
 	Expr      string `yaml:"expr"`
 }
 
-type configuration struct {
+type Configuration struct {
+	MaxWorkers int          `yaml:"max_workers"`
+	Flows      []FlowConfig `yaml:"flows"`
+}
+
+type FlowConfig struct {
 	FlowName    string       `yaml:"flow_name"`
 	EventsName  []string     `yaml:"events_name"`
 	Transitions []transition `yaml:"transitions"`

@@ -18,9 +18,10 @@ func Test_parseConfigFile(t *testing.T) {
 			SetConfigPath(tt.fileName)
 			parseConfigFile()
 			config := globalConfigure
-			if testFlow, existed := config["test_flow"]; !existed {
-				t.Errorf("test_flow not existed")
-			} else {
+			if config.MaxWorkers != 20 {
+				t.Errorf("MaxWorkers not match")
+			}
+			for _, testFlow := range config.Flows {
 				if testFlow.FlowName != "test_flow" {
 					t.Errorf("test_flow name not match")
 				}
