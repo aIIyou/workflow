@@ -1,6 +1,14 @@
-package event_flow
+package event
 
-import "context"
+import (
+	"context"
+
+	"github.com/google/uuid"
+)
+
+const (
+	StatusPending = "pending"
+)
 
 type Event struct {
 	Id string
@@ -13,13 +21,17 @@ type Event struct {
 	// This provides human-readable context for monitoring and debugging.
 	Name string
 
-	ctx context.Context
+	// Status is the event status
+	// when event is created,the status is "pending"
+	Status string
+
+	Ctx context.Context
 
 	// Handler is the event handler
 	Handler func(ctx context.Context)
 
 	//FlowId is the workflow id
-	FlowId int64
+	FlowId string
 
 	//FlowType is the workflow type
 	FlowType string
@@ -68,4 +80,8 @@ var GlobalEndEvent = &EndEvent{
 		Handler: func(ctx context.Context) {
 		},
 	},
+}
+
+func LoadEvent(eventId string) (*Event, error) {
+	return nil, nil
 }
