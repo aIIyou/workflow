@@ -1,4 +1,4 @@
-package event_flow
+package flow
 
 import (
 	"context"
@@ -11,6 +11,9 @@ import (
 	"sync"
 
 	"github.com/aIIyou/workflow/config"
+	"github.com/aIIyou/workflow/event"
+	"github.com/aIIyou/workflow/storage/adapter"
+	"github.com/google/uuid"
 )
 
 type Transition struct {
@@ -184,7 +187,7 @@ func NewTransition(fromEvent, toEvent, expr string) Transition {
 	exprFunc := parseExpression(expr)
 
 	tran.f = func(ctx context.Context) bool {
-		businessData := ctx.Value(KEY_BUSINESS_DATA)
+		businessData := ctx.Value(KeyBusinessData)
 		if businessData == nil {
 			return false
 		}
@@ -261,6 +264,9 @@ type EventFlow struct {
 	//events contained by event flow.
 	events []string
 
+	//first event of event flow.
+	startEvent string
+
 	//transitions define how to flow from one event to another after it is executed.
 	transitions map[string][]Transition
 
@@ -331,7 +337,7 @@ func (flow *EventFlow) AddTransitions(transitions []config.Transition) *EventFlo
 	return flow
 }
 
-func (flow *EventFlow) NextEvent(event *Event) string {
+func (flow *EventFlow) NextEvent(event *event.Event) string {
 	return ""
 }
 
@@ -364,11 +370,12 @@ func RegisterWorkflow(name string, handler any, conf *config.Configuration) erro
 			return err
 		}
 		flow := &EventFlow{
-			_type:   name,
-			name:    name,
-			events:  flowConfig.EventsName,
-			handler: handler,
-			mu:      &sync.RWMutex{},
+			_type:      name,
+			name:       name,
+			events:     flowConfig.EventsName,
+			startEvent: flowConfig.StartEvent,
+			handler:    handler,
+			mu:         &sync.RWMutex{},
 		}
 		flow.AddTransitions(flowConfig.Transitions)
 		globalWorkflow[name] = flow
@@ -434,7 +441,7 @@ func validateHandler(handler any, eventsName []string) error {
 	return nil
 }
 
-// toCamelCase 将字符串转换为大写开头的驼峰命名法
+// toCamelCase Convert string to camelCase notation starting with uppercase
 func toCamelCase(s string) string {
 	if s == "" {
 		return s
@@ -452,11 +459,39 @@ func toCamelCase(s string) string {
 	return strings.Join(parts, "")
 }
 
-// getKeys 获取map的所有key
+// getKeys Get all keys of map
 func getKeys(m map[string]bool) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+//event workflow control entry
+
+func StartEventFlow(ctx context.Context, name string, data any) (flowId string, err error) {
+	globalWorkflowMutex.RLock()
+	defer globalWorkflowMutex.RUnlock()
+	workflow, ok := globalWorkflow[name]
+	if !ok {
+		return "", fmt.Errorf("event flow %s not found", name)
+	}
+
+	flowId = uuid.NewString()
+
+	startEventName := workflow.startEvent
+
+	//event entity
+	startEvent := &event.Event{
+		Id:       uuid.NewString(),
+		Type:     startEventName,
+		Name:     startEventName,
+		Status:   event.StatusPending,
+		Ctx:      context.Background(),
+		FlowId:   flowId,
+		FlowType: name,
+	}
+	err = adapter.CreateEvent(ctx, startEvent)
+	return flowId, err
 }
