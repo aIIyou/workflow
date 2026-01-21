@@ -11,8 +11,9 @@ workflow:
        - "test_event_2"
        - "test_event_3"
        - "test_event_4"
+      start_event: "test_event_1"
       transitions:
-       - from_event: "test_event_1 "
+       - from_event: "test_event_1"
          to_event: "test_event_2"
          expr: "event_1_done == true"
        - from_event: "test_event_2"

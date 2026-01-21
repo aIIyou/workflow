@@ -31,6 +31,7 @@ type Configuration struct {
 type FlowConfig struct {
 	FlowName    string       `yaml:"flow_name"`
 	EventsName  []string     `yaml:"events_name"`
+	StartEvent  string       `yaml:"start_event"`
 	Transitions []Transition `yaml:"transitions"`
 }
 
