@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	flow "github.com/aIIyou/workflow/event_flow"
+	"github.com/aIIyou/workflow/event"
 	"github.com/aIIyou/workflow/storage/mysql"
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
@@ -22,7 +22,7 @@ type GfAdapter struct {
 	group string
 }
 
-func (gfa *GfAdapter) CreateEvent(ctx context.Context, event *flow.Event) error {
+func (gfa *GfAdapter) CreateEvent(ctx context.Context, e *event.Event) error {
 
 	// whether to commit or rollback transaction locally
 	localTx := false
@@ -46,12 +46,12 @@ func (gfa *GfAdapter) CreateEvent(ctx context.Context, event *flow.Event) error 
 	//note: the status of event is pending
 	//note: the event is not processed util worker query it
 	var (
-		eventId     = event.Id
-		eventType   = event.Type
-		eventName   = event.Name
-		eventStatus = flow.StatusPending
-		flowId      = event.FlowId
-		flowType    = event.FlowType
+		eventId     = e.Id
+		eventType   = e.Type
+		eventName   = e.Name
+		eventStatus = event.StatusPending
+		flowId      = e.FlowId
+		flowType    = e.FlowType
 	)
 	_, err = tx.Exec(mysql.CreateEvent, eventId, eventType, eventName, eventStatus, flowId, flowType)
 	if err != nil {

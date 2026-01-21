@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	flow "github.com/aIIyou/workflow/event_flow"
+	"github.com/aIIyou/workflow/event"
 )
 
 type FrameworkName string
@@ -36,7 +36,7 @@ type Adapter interface {
 
 	//CreateEvent insert event into table `event_queue`
 	//Canonical adapter must use transaction to make insert and user logic atomic.
-	CreateEvent(ctx context.Context, event *flow.Event) error
+	CreateEvent(ctx context.Context, event *event.Event) error
 }
 
 func RegisterAdapter(name FrameworkName, adapter Adapter) error {
@@ -60,4 +60,17 @@ func RetrieveAdapter(name FrameworkName) (Adapter, error) {
 	} else {
 		return adapter, nil
 	}
+}
+
+// default ORM framework unified operation entrance
+// the default orm framework is specified by the global variable framework
+// user can use function SetFrameworkName to specify global default ORM framework
+// note: global default ORM framework can only be specified once
+
+func CreateEvent(ctx context.Context, event *event.Event) error {
+	adapter, err := RetrieveAdapter(framework)
+	if err != nil {
+		return err
+	}
+	return adapter.CreateEvent(ctx, event)
 }
