@@ -7,7 +7,11 @@ import (
 )
 
 const (
-	StatusPending = "pending"
+	StatusCanceled = "canceled"
+	StatusFailed   = "failed"
+	StatusFinished = "finished"
+	StatusPaused   = "paused"
+	StatusPending  = "pending"
 )
 
 type Event struct {
