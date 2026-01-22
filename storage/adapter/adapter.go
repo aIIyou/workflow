@@ -37,6 +37,13 @@ type Adapter interface {
 	//CreateEvent insert event into table `event_queue`
 	//Canonical adapter must use transaction to make insert and user logic atomic.
 	CreateEvent(ctx context.Context, event *event.Event) error
+
+	// RetrievePendingEvent retrieves the next pending event from the event queue.
+	// This method should return the oldest pending event that is ready for processing.
+	// Returns:
+	//   - *event.Event: The retrieved pending event, or nil if no pending events are available
+	//   - error: Any error encountered during retrieval, such as database connection issues
+	RetrievePendingEvent(ctx context.Context) (*event.Event, error)
 }
 
 func RegisterAdapter(name FrameworkName, adapter Adapter) error {
@@ -73,4 +80,12 @@ func CreateEvent(ctx context.Context, event *event.Event) error {
 		return err
 	}
 	return adapter.CreateEvent(ctx, event)
+}
+
+func RetrievePendingEvent(ctx context.Context) (*event.Event, error) {
+	adapter, err := RetrieveAdapter(framework)
+	if err != nil {
+		return nil, err
+	}
+	return adapter.RetrievePendingEvent(ctx)
 }

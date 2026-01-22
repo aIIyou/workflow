@@ -73,3 +73,20 @@ func (gfa *GfAdapter) CreateEvent(ctx context.Context, e *event.Event) error {
 	}
 	return nil
 }
+
+func (gfa *GfAdapter) RetrievePendingEvent(ctx context.Context) (*event.Event, error) {
+	result, err := g.DB(gfa.group).Query(ctx, mysql.RetrievePendingEvent)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Len() <= 0 {
+		return nil, nil
+	}
+	events := make([]*event.Event, 0)
+	err = result.Structs(&events)
+	if err != nil {
+		return nil, err
+	}
+	return events[0], nil
+}
