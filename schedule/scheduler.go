@@ -73,7 +73,13 @@ type eventScheduler struct {
 }
 
 func (s *eventScheduler) Schedule(ctx context.Context) error {
+	//TODO ctx分离
+	go s.doSchedule(ctx)
 	return nil
+}
+
+func (s *eventScheduler) doSchedule(ctx context.Context) {
+
 }
 
 func (s *eventScheduler) RetrievePendingEvent(ctx context.Context) (*event.Event, error) {
