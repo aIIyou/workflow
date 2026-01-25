@@ -5,3 +5,13 @@ const (
 
 	RetrievePendingEvent = "SELECT * FROM `event_queue` WHERE `status` = 'pending' AND `heartbeat_at` IS NULL LIMIT 1 FOR UPDATE"
 )
+
+const (
+	create_flow_table = `
+CREATE TABLE work_flow(
+    flow_id varchar(256),
+    flow_type varchar(256),
+    flow_name varchar(256),
+    current_event varchar(256)
+)`
+)
