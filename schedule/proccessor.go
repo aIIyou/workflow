@@ -2,9 +2,19 @@ package schedule
 
 import (
 	"context"
+	"sync/atomic"
 
 	"github.com/aIIyou/workflow/event"
 )
+
+var (
+	activateWorker atomic.Int64
+)
+
+func InitProcessor() {
+	var initCount int64 = 0
+	atomic.LoadInt64(&initCount)
+}
 
 // Processor defines the interface for event scheduling operations in the workflow system.
 // It provides methods for retrieving, processing, and creating events in the scheduling pipeline.
