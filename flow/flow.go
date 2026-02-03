@@ -362,17 +362,22 @@ func RegisterWorkflow(name string, handler any, conf *config.Configuration) erro
 	if conf == nil {
 		return fmt.Errorf("configure is nil")
 	}
-	for _, flowConfig := range conf.Flows {
+	for _, flowConfig := range conf.Flow {
 		if flowConfig.FlowName != name {
 			continue
 		}
-		if err := validateHandler(handler, flowConfig.EventsName); err != nil {
+		eventNames := make([]string, len(flowConfig.Event))
+		for i, eventConfig := range flowConfig.Event {
+			eventNames[i] = eventConfig.Name
+		}
+
+		if err := validateHandler(handler, eventNames); err != nil {
 			return err
 		}
 		flow := &EventFlow{
 			_type:      name,
 			name:       name,
-			events:     flowConfig.EventsName,
+			events:     eventNames,
 			startEvent: flowConfig.StartEvent,
 			handler:    handler,
 			mu:         &sync.RWMutex{},
