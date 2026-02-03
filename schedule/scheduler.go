@@ -29,9 +29,10 @@ const (
 func ScheduleInit(maxProcessor int) {
 	f := func() {
 		scheduler = &eventScheduler{
-			name:         eventSchedulerName,
-			maxProcessor: maxProcessor,
-			processors:   make(map[string]Processor, maxProcessor),
+			name:          eventSchedulerName,
+			maxProcessor:  maxProcessor,
+			processors:    make(map[string]Processor, maxProcessor),
+			syncProcessor: new(defaultProcessor),
 		}
 	}
 	schedulerOnce.Do(f)
@@ -85,6 +86,10 @@ type Scheduler interface {
 	RetrieveFlowPendingEvent(ctx context.Context, flowId string) (*event.Event, error)
 
 	CurrentProcessorNumber(ctx context.Context) int
+
+	//ExecuteEventFlow queries the current event execution of the specified flow, and
+	//calculates the next event and writes it to the storage system
+	ExecuteEventFlow(ctx context.Context, flowId string) error
 }
 
 type eventScheduler struct {
@@ -96,8 +101,11 @@ type eventScheduler struct {
 	//maxProcessor limit the number of processor goroutine per host
 	maxProcessor int
 
-	//processors is directory of processor which are used to process event
+	//processors is directory of processor which are used to process asynchronous event
 	processors map[string]Processor
+
+	//syncProcessor is the processor which is used to process synchronous event
+	syncProcessor Processor
 }
 
 func (s *eventScheduler) Schedule(ctx context.Context) error {
@@ -129,4 +137,14 @@ func (s *eventScheduler) startProcessing(ctx context.Context) {
 
 func (s *eventScheduler) CurrentProcessorNumber(ctx context.Context) int {
 	return len(s.processors)
+}
+
+func (s *eventScheduler) ExecuteEventFlow(ctx context.Context, flowId string) error {
+
+	e, err := s.RetrieveFlowPendingEvent(ctx, flowId)
+	if err != nil {
+		return err
+	}
+
+	return s.syncProcessor.ProcessSyncPendingEvent(ctx, e)
 }

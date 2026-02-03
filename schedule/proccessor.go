@@ -34,6 +34,10 @@ type Processor interface {
 	//GetProcessorId return the processor unique identification
 	GetProcessorId(ctx context.Context) string
 
+	ProcessAsyncPendingEvent(ctx context.Context, event *event.Event) error
+
+	ProcessSyncPendingEvent(ctx context.Context, event *event.Event) error
+
 	Process(ctx context.Context)
 }
 
@@ -45,8 +49,12 @@ func (p *defaultProcessor) RetrievePendingEvent(ctx context.Context) (*event.Eve
 	return nil, nil
 }
 
-func (p *defaultProcessor) ProcessPendingEvent(ctx context.Context, e *event.Event) error {
+func (p *defaultProcessor) ProcessAsyncPendingEvent(ctx context.Context, e *event.Event) error {
 	// TODO: Implement event processing logic
+	return nil
+}
+
+func (p *defaultProcessor) ProcessSyncPendingEvent(ctx context.Context, e *event.Event) error {
 	return nil
 }
 
