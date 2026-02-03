@@ -44,6 +44,13 @@ type Adapter interface {
 	//   - *event.Event: The retrieved pending event, or nil if no pending events are available
 	//   - error: Any error encountered during retrieval, such as database connection issues
 	RetrievePendingEvent(ctx context.Context) (*event.Event, error)
+
+	//RetrieveFlowPendingEvent get the pending events from the specified flow
+	//!!!
+	//the event system is designed to restrict a flow to only allow
+	//one event in the pending state to exist at the same time.
+	//!!!
+	RetrieveFlowPendingEvent(ctx context.Context, flowId string) (*event.Event, error)
 }
 
 func RegisterAdapter(name FrameworkName, adapter Adapter) error {
@@ -88,4 +95,12 @@ func RetrievePendingEvent(ctx context.Context) (*event.Event, error) {
 		return nil, err
 	}
 	return adapter.RetrievePendingEvent(ctx)
+}
+
+func RetrieveFlowPendingEvent(ctx context.Context, flowId string) (*event.Event, error) {
+	adapter, err := RetrieveAdapter(framework)
+	if err != nil {
+		return nil, err
+	}
+	return adapter.RetrieveFlowPendingEvent(ctx, flowId)
 }

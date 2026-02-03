@@ -4,6 +4,10 @@ const (
 	CreateEvent = "INSERT INTO `event_queue`(`event_id`,`type`,`name`,`status`,`flow_id`,`flow_type`)VALUES(?,?,?,?,?,?)"
 
 	RetrievePendingEvent = "SELECT * FROM `event_queue` WHERE `status` = 'pending' AND `heartbeat_at` IS NULL LIMIT 1 FOR UPDATE"
+
+	RetrieveFlowPendingEvent = "SELECT * FROM `event_queue` WHERE `flow_id` = ? AND `status` = 'pending' AND `visible_at` <= now()  LIMIT 1 FOR UPDATE"
+
+	UpdatePendingEventStatus = "UPDATE `event_queue` set `status` = 'processing' WHERE `flow_id` = ?"
 )
 
 const (

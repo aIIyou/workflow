@@ -90,3 +90,46 @@ func (gfa *GfAdapter) RetrievePendingEvent(ctx context.Context) (*event.Event, e
 	}
 	return events[0], nil
 }
+
+func (gfa *GfAdapter) RetrieveFlowPendingEvent(ctx context.Context, flowId string) (*event.Event, error) {
+	var (
+		localTx bool
+	)
+	tx := gdb.TXFromCtx(ctx, gfa.group)
+	if tx == nil {
+		tx = gdb.TXFromCtx(ctx, gfa.group)
+		localTx = true
+	}
+	result, err := tx.Query(mysql.RetrieveFlowPendingEvent, flowId)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Len() <= 0 {
+		return nil, nil
+	}
+	if result.Len() > 1 {
+		panic(fmt.Sprintf(`here are more than 1 pending event of flow "%s"`, flowId))
+	}
+	events := make([]*event.Event, 0)
+	err = result.Structs(&events)
+	if err != nil {
+		return nil, err
+	}
+	_, err = tx.Exec(mysql.UpdatePendingEventStatus, flowId)
+	if err != nil {
+		if localTx {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				return nil, fmt.Errorf("exec failed: %w; rollback also failed: %v", err, rollbackErr)
+			}
+		}
+		return nil, fmt.Errorf(`exec failed: %v`, err)
+	}
+	if localTx {
+		if commitErr := tx.Commit(); commitErr != nil {
+			return nil, fmt.Errorf("commit failed: %w", commitErr)
+		}
+	}
+	events[0].Status = event.StatusProcessing
+	return events[0], nil
+}
