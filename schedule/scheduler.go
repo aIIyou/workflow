@@ -3,8 +3,10 @@ package schedule
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"github.com/aIIyou/workflow/event"
+	"github.com/aIIyou/workflow/storage/adapter"
 )
 
 var (
@@ -14,6 +16,8 @@ var (
 
 	//schedulerOnce scheduler could be initialized only once
 	schedulerOnce sync.Once
+
+	maintain atomic.Bool
 )
 
 const (
@@ -31,11 +35,26 @@ func ScheduleInit(maxProcessor int) {
 		}
 	}
 	schedulerOnce.Do(f)
+	maintain.Store(false)
 	return
 }
 
 func LaunchScheduler(ctx context.Context) error {
 	return scheduler.Schedule(ctx)
+}
+
+func CurrentProcessNumber(ctx context.Context) int {
+	return scheduler.CurrentProcessorNumber(ctx)
+}
+
+func StartMaintain(ctx context.Context) error {
+	maintain.Store(true)
+	return nil
+}
+
+func CloseMaintain(ctx context.Context) error {
+	maintain.Store(false)
+	return nil
 }
 
 type Scheduler interface {
@@ -57,6 +76,15 @@ type Scheduler interface {
 	// Returns:
 	//   - error: Any error encountered during processing, such as validation failures or execution errors
 	RetrieveExpiredEvent(ctx context.Context) (*event.Event, error)
+
+	//RetrieveFlowPendingEvent get the pending events from the specified flow
+	//!!!
+	//the event system is designed to restrict a flow to only allow
+	//one event in the pending state to exist at the same time.
+	//!!!
+	RetrieveFlowPendingEvent(ctx context.Context, flowId string) (*event.Event, error)
+
+	CurrentProcessorNumber(ctx context.Context) int
 }
 
 type eventScheduler struct {
@@ -90,7 +118,15 @@ func (s *eventScheduler) RetrieveExpiredEvent(ctx context.Context) (*event.Event
 	return nil, nil
 }
 
+func (s *eventScheduler) RetrieveFlowPendingEvent(ctx context.Context, flowId string) (*event.Event, error) {
+	return adapter.RetrieveFlowPendingEvent(ctx, flowId)
+}
+
 // startProcessing starts the event processing loop for all processors
 func (s *eventScheduler) startProcessing(ctx context.Context) {
 	return
+}
+
+func (s *eventScheduler) CurrentProcessorNumber(ctx context.Context) int {
+	return len(s.processors)
 }
