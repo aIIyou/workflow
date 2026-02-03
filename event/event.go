@@ -25,6 +25,9 @@ type Event struct {
 	// This provides human-readable context for monitoring and debugging.
 	Name string
 
+	//Async is used to distinguish whether an event is processed synchronously or asynchronously
+	Async bool
+
 	// Status is the event status
 	// when event is created,the status is "pending"
 	Status string
@@ -42,9 +45,12 @@ type Event struct {
 }
 
 // NewEvent create a new event
-func NewEvent(eventType, name string, handler func(ctx context.Context)) *Event {
+func NewEvent(eventType, name string, async bool, handler func(ctx context.Context)) *Event {
+
 	return &Event{
+		Id:      uuid.NewString(),
 		Type:    eventType,
+		Async:   async,
 		Name:    name,
 		Handler: handler,
 	}
