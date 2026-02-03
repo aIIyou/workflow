@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"sync"
 
@@ -24,15 +25,20 @@ type Transition struct {
 }
 
 type Configuration struct {
-	MaxWorkers int          `yaml:"max_workers"`
-	Flows      []FlowConfig `yaml:"flows"`
+	MaxWorker int          `yaml:"max_worker"`
+	Flow      []FlowConfig `yaml:"flow"`
+}
+
+type EventConfig struct {
+	Name  string `yaml:"name"`
+	Async bool   `yaml:"async"`
 }
 
 type FlowConfig struct {
-	FlowName    string       `yaml:"flow_name"`
-	EventsName  []string     `yaml:"events_name"`
-	StartEvent  string       `yaml:"start_event"`
-	Transitions []Transition `yaml:"transitions"`
+	FlowName    string        `yaml:"flow_name"`
+	Event       []EventConfig `yaml:"event"`
+	StartEvent  string        `yaml:"start_event"`
+	Transitions []Transition  `yaml:"transition"`
 }
 
 func SetConfigPath(path string) {
@@ -44,8 +50,8 @@ func GetConfigPath() string {
 }
 
 func GetConfigure() *Configuration {
-	globalConfigureMutex.Lock()
-	defer globalConfigureMutex.Unlock()
+	globalConfigureMutex.RLock()
+	defer globalConfigureMutex.RUnlock()
 	if globalConfigure == nil {
 		parseConfigFile()
 	}
@@ -77,11 +83,14 @@ func parseConfigFile() {
 		if err != nil {
 			panic(err)
 		}
-
+		globalConfigureMutex.Lock()
+		defer globalConfigureMutex.Unlock()
 		globalConfigure = new(Configuration)
 
 		if err := yaml.Unmarshal(workflowData, globalConfigure); err != nil {
 			panic(err)
 		}
+	} else {
+		panic(fmt.Sprintf(`key "%s" not exists`, configKey))
 	}
 }
