@@ -389,6 +389,16 @@ func RegisterWorkflow(name string, handler any, conf *config.Configuration) erro
 	return fmt.Errorf(`workflow "%s" not configured`, name)
 }
 
+// RetrieveWorkFlow retrieve workflow
+func RetrieveWorkflow(name string) (flow *EventFlow, err error) {
+	globalWorkflowMutex.RLock()
+	defer globalWorkflowMutex.RUnlock()
+	if flow, existed := globalWorkflow[name]; existed {
+		return flow, nil
+	}
+	return nil, fmt.Errorf(`workflow "%s" not exists`, name)
+}
+
 func validateHandler(handler any, eventsName []string) error {
 	// Validate that handler is a struct or pointer to struct
 	val := reflect.ValueOf(handler)
