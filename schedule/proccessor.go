@@ -10,7 +10,6 @@ import (
 
 	"github.com/aIIyou/workflow/event"
 	"github.com/aIIyou/workflow/flow"
-	"github.com/aIIyou/workflow/storage/adapter"
 	"github.com/aIIyou/workflow/util"
 )
 
@@ -41,23 +40,24 @@ type Processor interface {
 	//GetProcessorId return the processor unique identification
 	GetProcessorId(ctx context.Context) string
 
-	ProcessAsyncPendingEvent(ctx context.Context, event *event.Event) error
-
-	ProcessSyncPendingEvent(ctx context.Context, event *event.Event) error
+	//processAsyncPendingEvent(ctx context.Context, event *event.Event) error
+	//
+	//processSyncPendingEvent(ctx context.Context, event *event.Event) error
 
 	Process(ctx context.Context, event *event.Event)
 }
 
 // defaultProcessor is a basic implementation of Processor interface
 type defaultProcessor struct {
-	Name string
-	IP   string
+	ID        string
+	IP        string
+	scheduler Scheduler
 }
 
-func (p *defaultProcessor) ProcessAsyncPendingEvent(ctx context.Context, e *event.Event) error {
+func (p *defaultProcessor) executeUserMethod(ctx context.Context, e *event.Event) error {
+	flowId := e.FlowId
 	flowName := e.FlowName
 	eventName := e.Name
-	flowId := e.FlowId
 	eventFlow, err := flow.RetrieveEventflow(flowName)
 	if err != nil {
 		return err
@@ -76,18 +76,20 @@ func (p *defaultProcessor) ProcessAsyncPendingEvent(ctx context.Context, e *even
 		return fmt.Errorf("method %s not found in handler", eventName)
 	}
 
-	//获取flow中的data,种入ctx中
-	eventFlowInstance, err := adapter.RetrieveEventFlowInstance(ctx, flowId)
+	//获取用户写入的控制变量，因为用户的事务已经提交了，这里直接查数据表是可以获取到最新的控制变量的
+	f, err := (&flow.EventFlowInstance{}).RetrieveEventFlowInstance(ctx, flowId)
 	if err != nil {
 		return err
 	}
-	data := eventFlowInstance.Data
-	//将data反序列化（这里没有结构体参照，直接用通用的反序列化),然后种入到ctx中，key名为flow.KeyBusinessData
-	var businessData map[string]interface{}
-	if err := json.Unmarshal([]byte(data), &businessData); err != nil {
+	flowDataStr, err := f.RetrieveEventFlowData(ctx)
+	if err != nil {
+		return err
+	}
+	var flowData map[string]interface{}
+	if err := json.Unmarshal([]byte(flowDataStr), &flowData); err != nil {
 		return fmt.Errorf("failed to unmarshal business data: %v", err)
 	}
-	ctx = context.WithValue(ctx, flow.KeyBusinessData, businessData)
+	ctx = context.WithValue(ctx, flow.KeyData, flowData)
 
 	// 调用方法，传入context参数
 	results := method.Call([]reflect.Value{
@@ -100,26 +102,39 @@ func (p *defaultProcessor) ProcessAsyncPendingEvent(ctx context.Context, e *even
 			return errVal
 		}
 	}
-
-	return p.CreateNextEvent(ctx, e, eventFlow)
-}
-
-func (p *defaultProcessor) ProcessSyncPendingEvent(ctx context.Context, e *event.Event) error {
 	return nil
 }
 
-func (p *defaultProcessor) CreateNextEvent(ctx context.Context, e *event.Event, ef *flow.FLow) error {
-	// TODO: Implement next event creation logic
+func (p *defaultProcessor) processAsyncPendingEvent(ctx context.Context, e *event.Event) error {
+	err := p.executeUserMethod(ctx, e)
+	if err != nil {
+		return err
+	}
+
+	//TODO 这里要交给EventFlow去流转了
+	return nil
+}
+
+func (p *defaultProcessor) processSyncPendingEvent(ctx context.Context, e *event.Event) error {
+	return nil
+}
+
+func (p *defaultProcessor) processAsyncExpiredEvent(ctx context.Context, e *event.Event) error {
 	return nil
 }
 
 func (p *defaultProcessor) GetProcessorId(ctx context.Context) string {
-	// TODO: Implement processor ID retrieval
-	return "default_processor"
+	return p.ID
 }
 
 func (p *defaultProcessor) Process(ctx context.Context, e *event.Event) {
-
+	if e.Async && e.Status == event.StatusPending {
+		_ = p.processAsyncPendingEvent(ctx, e)
+	} else if !e.Async && e.Status == event.StatusPending {
+		_ = p.processSyncPendingEvent(ctx, e)
+	} else if e.Async && e.Status == event.StatusProcessing {
+		_ = p.processAsyncExpiredEvent(ctx, e)
+	}
 }
 
 func NewProcessor() Processor {
@@ -127,7 +142,8 @@ func NewProcessor() Processor {
 	now := time.Now().String()
 	localIP := util.BoundMachineUtil{}.LocalIP()
 	return &defaultProcessor{
-		Name: fmt.Sprintf(`%s_%s`, localIP, now),
-		IP:   localIP,
+		ID:        fmt.Sprintf(`%s_%s`, localIP, now),
+		IP:        localIP,
+		scheduler: globalScheduler,
 	}
 }
