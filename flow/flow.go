@@ -253,7 +253,7 @@ func (t *Transition) Evaluate(ctx context.Context) bool {
 	return t.f(ctx)
 }
 
-type EventFlow struct {
+type FLow struct {
 
 	//_type  event flow type.
 	_type string
@@ -277,8 +277,8 @@ type EventFlow struct {
 }
 
 // NewEventFlow 创建一个新的事件流实例
-func NewEventFlow(flowType, name string, events []string, transitions []Transition) *EventFlow {
-	flow := &EventFlow{
+func NewEventFlow(flowType, name string, events []string, transitions []Transition) *FLow {
+	flow := &FLow{
 		_type:       flowType,
 		name:        name,
 		mu:          new(sync.RWMutex),
@@ -294,21 +294,21 @@ func NewEventFlow(flowType, name string, events []string, transitions []Transiti
 	return flow
 }
 
-func (flow *EventFlow) Name() string {
+func (flow *FLow) Name() string {
 	flow.mu.RLock()
 	defer flow.mu.RUnlock()
 	name := flow.name
 	return name
 }
 
-func (flow *EventFlow) Type() string {
+func (flow *FLow) Type() string {
 	flow.mu.RLock()
 	defer flow.mu.RUnlock()
 	_type := flow._type
 	return _type
 }
 
-func (flow *EventFlow) AddEvents(events []string) *EventFlow {
+func (flow *FLow) AddEvents(events []string) *FLow {
 	flow.mu.Lock()
 	defer flow.mu.Unlock()
 	if flow.events == nil {
@@ -318,7 +318,7 @@ func (flow *EventFlow) AddEvents(events []string) *EventFlow {
 	return flow
 }
 
-func (flow *EventFlow) AddTransitions(transitions []config.Transition) *EventFlow {
+func (flow *FLow) AddTransitions(transitions []config.Transition) *FLow {
 	flow.mu.Lock()
 	defer flow.mu.Unlock()
 	if flow.transitions == nil {
@@ -337,12 +337,16 @@ func (flow *EventFlow) AddTransitions(transitions []config.Transition) *EventFlo
 	return flow
 }
 
-func (flow *EventFlow) NextEvent(event *event.Event) string {
-	return ""
+func (flow *FLow) NextEvent(event *event.Event) error {
+	return nil
+}
+
+func (flow *FLow) Handler() any {
+	return flow.handler
 }
 
 var (
-	globalWorkflow      map[string]*EventFlow
+	globalWorkflow      map[string]*FLow
 	globalWorkflowMutex sync.RWMutex
 )
 
@@ -351,7 +355,7 @@ func RegisterWorkflow(name string, handler any, conf *config.Configuration) erro
 	globalWorkflowMutex.Lock()
 	defer globalWorkflowMutex.Unlock()
 	if globalWorkflow == nil {
-		globalWorkflow = make(map[string]*EventFlow)
+		globalWorkflow = make(map[string]*FLow)
 	}
 	if _, existed := globalWorkflow[name]; existed {
 		return fmt.Errorf(`workflow "%s" already registered`, name)
@@ -374,7 +378,7 @@ func RegisterWorkflow(name string, handler any, conf *config.Configuration) erro
 		if err := validateHandler(handler, eventNames); err != nil {
 			return err
 		}
-		flow := &EventFlow{
+		flow := &FLow{
 			_type:      name,
 			name:       name,
 			events:     eventNames,
@@ -390,7 +394,7 @@ func RegisterWorkflow(name string, handler any, conf *config.Configuration) erro
 }
 
 // RetrieveWorkFlow retrieve workflow
-func RetrieveWorkflow(name string) (flow *EventFlow, err error) {
+func RetrieveEventflow(name string) (flow *FLow, err error) {
 	globalWorkflowMutex.RLock()
 	defer globalWorkflowMutex.RUnlock()
 	if flow, existed := globalWorkflow[name]; existed {
@@ -499,7 +503,7 @@ func StartEventFlow(ctx context.Context, name string, data any) (flowId string, 
 
 	//event entity
 	startEvent := &event.Event{
-		Id:       uuid.NewString(),
+		EventId:  uuid.NewString(),
 		Type:     startEventName,
 		Name:     startEventName,
 		Status:   event.StatusPending,
@@ -509,4 +513,12 @@ func StartEventFlow(ctx context.Context, name string, data any) (flowId string, 
 	}
 	err = adapter.CreateEvent(ctx, startEvent)
 	return flowId, err
+}
+
+func RetrieveContextData(ctx context.Context, flowId string) (data string, err error) {
+	eventFlowInstance, err := adapter.RetrieveEventFlowInstance(ctx, flowId)
+	if err != nil {
+		return "", err
+	}
+	return eventFlowInstance.Data, err
 }
