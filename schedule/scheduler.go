@@ -4,17 +4,18 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/aIIyou/workflow/event"
 	"github.com/aIIyou/workflow/storage/adapter"
 )
 
 var (
-	// scheduler global event process scheduler
-	// it is guaranteed that here is only one scheduler in os specified process
-	scheduler Scheduler
+	// globalScheduler global event process globalScheduler
+	// it is guaranteed that here is only one globalScheduler in os specified process
+	globalScheduler Scheduler
 
-	//schedulerOnce scheduler could be initialized only once
+	//schedulerOnce globalScheduler could be initialized only once
 	schedulerOnce sync.Once
 
 	maintain atomic.Bool
@@ -26,9 +27,9 @@ const (
 
 // ScheduleInit
 // avoid to use golang init function as initialization sequence out of control
-func ScheduleInit(maxProcessor int) {
+func ScheduleInit(maxProcessor int64) {
 	f := func() {
-		scheduler = &eventScheduler{
+		globalScheduler = &eventScheduler{
 			name:          eventSchedulerName,
 			maxProcessor:  maxProcessor,
 			processors:    make(map[string]Processor, maxProcessor),
@@ -41,11 +42,11 @@ func ScheduleInit(maxProcessor int) {
 }
 
 func LaunchScheduler(ctx context.Context) error {
-	return scheduler.Schedule(ctx)
+	return globalScheduler.Schedule(ctx)
 }
 
-func CurrentProcessNumber(ctx context.Context) int {
-	return scheduler.CurrentProcessorNumber(ctx)
+func CurrentProcessNumber(ctx context.Context) int64 {
+	return globalScheduler.CurrentProcessorNumber(ctx)
 }
 
 func StartMaintain(ctx context.Context) error {
@@ -78,28 +79,20 @@ type Scheduler interface {
 	//   - error: Any error encountered during processing, such as validation failures or execution errors
 	RetrieveExpiredEvent(ctx context.Context) (*event.Event, error)
 
-	//RetrieveFlowPendingEvent get the pending events from the specified flow
-	//!!!
-	//the event system is designed to restrict a flow to only allow
-	//one event in the pending state to exist at the same time.
-	//!!!
-	RetrieveFlowPendingEvent(ctx context.Context, flowId string) (*event.Event, error)
-
-	CurrentProcessorNumber(ctx context.Context) int
-
-	//ExecuteEventFlow queries the current event execution of the specified flow, and
-	//calculates the next event and writes it to the storage system
-	ExecuteEventFlow(ctx context.Context, flowId string) error
+	CurrentProcessorNumber(ctx context.Context) int64
 }
 
 type eventScheduler struct {
 
-	//name scheduler name.
+	//name globalScheduler name.
 	//reserved
 	name string
 
 	//maxProcessor limit the number of processor goroutine per host
-	maxProcessor int
+	maxProcessor int64
+
+	//curProcessor records current process quant
+	curProcessor atomic.Int64
 
 	//processors is directory of processor which are used to process asynchronous event
 	processors map[string]Processor
@@ -115,36 +108,64 @@ func (s *eventScheduler) Schedule(ctx context.Context) error {
 }
 
 func (s *eventScheduler) doSchedule(ctx context.Context) {
+	go s.PendingEventLoop(ctx)
+	go s.ExpiredEventLoop(ctx)
+}
 
+func (s *eventScheduler) PendingEventLoop(ctx context.Context) {
+	for {
+		if maintain.Load() {
+			time.Sleep(time.Second)
+		}
+		if s.curProcessor.Load() >= s.maxProcessor {
+			time.Sleep(time.Second)
+		}
+		pendingEvent, err := s.RetrievePendingEvent(ctx)
+		if err != nil {
+			time.Sleep(time.Second)
+		}
+		processor := NewProcessor()
+
+		go processor.Process(context.Background(), pendingEvent)
+	}
 }
 
 func (s *eventScheduler) RetrievePendingEvent(ctx context.Context) (*event.Event, error) {
-	return nil, nil
+
+	pendingEvent, err := adapter.RetrievePendingEvent(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return event.NewFromModel(pendingEvent), nil
+}
+
+func (s *eventScheduler) ExpiredEventLoop(ctx context.Context) {
+	for {
+		if maintain.Load() {
+			time.Sleep(time.Second)
+		}
+		if s.curProcessor.Load() >= s.maxProcessor {
+			time.Sleep(time.Second)
+		}
+		expiredEvent, err := s.RetrieveExpiredEvent(ctx)
+		if err != nil {
+			time.Sleep(time.Second)
+		}
+		processor := NewProcessor()
+
+		go processor.Process(context.Background(), expiredEvent)
+	}
 }
 
 func (s *eventScheduler) RetrieveExpiredEvent(ctx context.Context) (*event.Event, error) {
-	return nil, nil
-}
-
-func (s *eventScheduler) RetrieveFlowPendingEvent(ctx context.Context, flowId string) (*event.Event, error) {
-	return adapter.RetrieveFlowPendingEvent(ctx, flowId)
-}
-
-// startProcessing starts the event processing loop for all processors
-func (s *eventScheduler) startProcessing(ctx context.Context) {
-	return
-}
-
-func (s *eventScheduler) CurrentProcessorNumber(ctx context.Context) int {
-	return len(s.processors)
-}
-
-func (s *eventScheduler) ExecuteEventFlow(ctx context.Context, flowId string) error {
-
-	e, err := s.RetrieveFlowPendingEvent(ctx, flowId)
+	pendingEvent, err := adapter.RetrieveExpiredEvent(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	return event.NewFromModel(pendingEvent), nil
+}
 
-	return s.syncProcessor.ProcessSyncPendingEvent(ctx, e)
+func (s *eventScheduler) CurrentProcessorNumber(ctx context.Context) int64 {
+	return s.curProcessor.Load()
 }
