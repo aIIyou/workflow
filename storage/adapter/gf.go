@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/aIIyou/workflow/event"
+	"github.com/aIIyou/workflow/model"
 	"github.com/aIIyou/workflow/storage/mysql"
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
@@ -22,7 +23,7 @@ type GfAdapter struct {
 	group string
 }
 
-func (gfa *GfAdapter) CreateEvent(ctx context.Context, e *event.Event) error {
+func (gfa *GfAdapter) CreateEvent(ctx context.Context, e *model.Event) error {
 
 	// whether to commit or rollback transaction locally
 	localTx := false
@@ -46,7 +47,7 @@ func (gfa *GfAdapter) CreateEvent(ctx context.Context, e *event.Event) error {
 	//note: the status of event is pending
 	//note: the event is not processed util worker query it
 	var (
-		eventId     = e.Id
+		eventId     = e.EventId
 		eventType   = e.Type
 		eventName   = e.Name
 		eventStatus = event.StatusPending
@@ -74,7 +75,7 @@ func (gfa *GfAdapter) CreateEvent(ctx context.Context, e *event.Event) error {
 	return nil
 }
 
-func (gfa *GfAdapter) RetrievePendingEvent(ctx context.Context) (*event.Event, error) {
+func (gfa *GfAdapter) RetrievePendingEvent(ctx context.Context) (*model.Event, error) {
 	result, err := g.DB(gfa.group).Query(ctx, mysql.RetrievePendingEvent)
 	if err != nil {
 		return nil, err
@@ -83,7 +84,7 @@ func (gfa *GfAdapter) RetrievePendingEvent(ctx context.Context) (*event.Event, e
 	if result.Len() <= 0 {
 		return nil, nil
 	}
-	events := make([]*event.Event, 0)
+	events := make([]*model.Event, 0)
 	err = result.Structs(&events)
 	if err != nil {
 		return nil, err
@@ -91,7 +92,7 @@ func (gfa *GfAdapter) RetrievePendingEvent(ctx context.Context) (*event.Event, e
 	return events[0], nil
 }
 
-func (gfa *GfAdapter) RetrieveFlowPendingEvent(ctx context.Context, flowId string) (*event.Event, error) {
+func (gfa *GfAdapter) RetrieveFlowPendingEvent(ctx context.Context, flowId string) (*model.Event, error) {
 	var (
 		localTx bool
 	)
@@ -111,7 +112,7 @@ func (gfa *GfAdapter) RetrieveFlowPendingEvent(ctx context.Context, flowId strin
 	if result.Len() > 1 {
 		panic(fmt.Sprintf(`here are more than 1 pending event of flow "%s"`, flowId))
 	}
-	events := make([]*event.Event, 0)
+	events := make([]*model.Event, 0)
 	err = result.Structs(&events)
 	if err != nil {
 		return nil, err
@@ -132,4 +133,20 @@ func (gfa *GfAdapter) RetrieveFlowPendingEvent(ctx context.Context, flowId strin
 	}
 	events[0].Status = event.StatusProcessing
 	return events[0], nil
+}
+
+func (gfa *GfAdapter) RetrieveEventFlowInstance(ctx context.Context, flowId string) (*model.EventFlowInstance, error) {
+	result, err := g.DB(gfa.group).Query(ctx, mysql.RetrieveEventFlow, flowId)
+	if err != nil {
+		return nil, err
+	}
+	if result.Len() <= 0 {
+		return nil, nil
+	}
+	eventFlows := make([]*model.EventFlowInstance, 0)
+	err = result.Structs(&eventFlows)
+	if err != nil {
+		return nil, err
+	}
+	return eventFlows[0], nil
 }
