@@ -3,6 +3,7 @@ package event
 import (
 	"context"
 
+	"github.com/aIIyou/workflow/model"
 	"github.com/google/uuid"
 )
 
@@ -16,7 +17,7 @@ const (
 )
 
 type Event struct {
-	Id string
+	EventId string
 
 	// Type is the event category determined by the user's business logic layer.
 	// Examples: "payment.processed", "user.registered", "order.shipped"
@@ -43,13 +44,20 @@ type Event struct {
 
 	//FlowType is the workflow type
 	FlowType string
+
+	//FlowName is the workflow name
+	FlowName string
+}
+
+func NewFromModel(event *model.Event) *Event {
+	return nil
 }
 
 // NewEvent create a new event
 func NewEvent(eventType, name string, async bool, handler func(ctx context.Context)) *Event {
 
 	return &Event{
-		Id:      uuid.NewString(),
+		EventId: uuid.NewString(),
 		Type:    eventType,
 		Async:   async,
 		Name:    name,
@@ -59,7 +67,7 @@ func NewEvent(eventType, name string, async bool, handler func(ctx context.Conte
 
 // SetId set event id
 func (e *Event) SetId(id string) *Event {
-	e.Id = id
+	e.EventId = id
 	return e
 }
 
@@ -70,9 +78,9 @@ type StartEvent struct {
 
 var GlobalStartEvent = &StartEvent{
 	Event: Event{
-		Id:   uuid.New().String(),
-		Type: "start",
-		Name: "global-start",
+		EventId: uuid.New().String(),
+		Type:    "start",
+		Name:    "global-start",
 		Handler: func(ctx context.Context) {
 		},
 	},
@@ -85,9 +93,9 @@ type EndEvent struct {
 
 var GlobalEndEvent = &EndEvent{
 	Event: Event{
-		Id:   uuid.New().String(),
-		Type: "end",
-		Name: "global-end",
+		EventId: uuid.New().String(),
+		Type:    "end",
+		Name:    "global-end",
 		Handler: func(ctx context.Context) {
 		},
 	},
