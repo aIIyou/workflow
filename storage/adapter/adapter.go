@@ -56,6 +56,9 @@ type Adapter interface {
 
 	//RetrieveEventFlowInstance retrieves the event flow which flow_id equals @flowId
 	RetrieveEventFlowInstance(ctx context.Context, flowId string) (*model.EventFlowInstance, error)
+
+	//UpdateEventHeartbeat updates the heartbeat timestamp for the specified event
+	UpdateEventHeartbeat(ctx context.Context, eventId string) error
 }
 
 func RegisterAdapter(name FrameworkName, adapter Adapter) error {
@@ -124,4 +127,12 @@ func RetrieveEventFlowInstance(ctx context.Context, flowId string) (*model.Event
 		return nil, err
 	}
 	return adapter.RetrieveEventFlowInstance(ctx, flowId)
+}
+
+func UpdateEventHeartbeat(ctx context.Context, eventId string) error {
+	adapter, err := RetrieveAdapter(framework)
+	if err != nil {
+		return err
+	}
+	return adapter.UpdateEventHeartbeat(ctx, eventId)
 }

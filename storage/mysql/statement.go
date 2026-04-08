@@ -9,6 +9,8 @@ const (
 
 	UpdatePendingEventStatus = "UPDATE `event_queue` set `status` = 'processing' WHERE `flow_id` = ?"
 
+	UpdateEventHeartbeat = "UPDATE `event_queue` SET `heartbeat_at` = NOW() WHERE `event_id` = ?"
+
 	RetrieveEventFlow = "SELECT * From `event_flow` WHERE `flow_id` = ?"
 )
 

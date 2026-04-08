@@ -10,6 +10,7 @@ import (
 
 	"github.com/aIIyou/workflow/event"
 	"github.com/aIIyou/workflow/flow"
+	"github.com/aIIyou/workflow/storage/adapter"
 	"github.com/aIIyou/workflow/util"
 )
 
@@ -52,6 +53,10 @@ type defaultProcessor struct {
 	ID        string
 	IP        string
 	scheduler Scheduler
+}
+
+func (p *defaultProcessor) reportHeartBeat(ctx context.Context, e *event.Event) error {
+	return adapter.UpdateEventHeartbeat(ctx, e.EventId)
 }
 
 func (p *defaultProcessor) executeUserMethod(ctx context.Context, e *event.Event) error {
@@ -128,12 +133,45 @@ func (p *defaultProcessor) GetProcessorId(ctx context.Context) string {
 }
 
 func (p *defaultProcessor) Process(ctx context.Context, e *event.Event) {
+	// 创建带取消功能的context用于控制心跳协程
+	heartbeatCtx, cancel := context.WithCancel(ctx)
+
+	// 启动心跳协程，每秒更新一次heartbeat
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				// 更新心跳
+				if err := p.reportHeartBeat(ctx, e); err != nil {
+					// 记录错误但继续心跳
+					fmt.Printf("heartbeat update failed: %v\n", err)
+				}
+			case <-heartbeatCtx.Done():
+				// 上下文取消，停止心跳
+				return
+			}
+		}
+	}()
+
+	// 执行事件处理
+	var result error
 	if e.Async && e.Status == event.StatusPending {
-		_ = p.processAsyncPendingEvent(ctx, e)
+		result = p.processAsyncPendingEvent(ctx, e)
 	} else if !e.Async && e.Status == event.StatusPending {
-		_ = p.processSyncPendingEvent(ctx, e)
+		result = p.processSyncPendingEvent(ctx, e)
 	} else if e.Async && e.Status == event.StatusProcessing {
-		_ = p.processAsyncExpiredEvent(ctx, e)
+		result = p.processAsyncExpiredEvent(ctx, e)
+	}
+
+	// 处理完成，取消心跳协程
+	cancel()
+
+	// 返回处理结果
+	if result != nil {
+		fmt.Printf("event processing failed: %v\n", result)
 	}
 }
 
