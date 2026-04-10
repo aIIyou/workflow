@@ -158,3 +158,11 @@ func (gfa *GfAdapter) UpdateEventHeartbeat(ctx context.Context, eventId string) 
 	}
 	return nil
 }
+
+func (gfa *GfAdapter) UpdateEventFlowData(ctx context.Context, flowId string, data string) error {
+	_, err := g.DB(gfa.group).Exec(ctx, mysql.UpdateEventFlowData, data, flowId)
+	if err != nil {
+		return fmt.Errorf("failed to update event flow data: %v", err)
+	}
+	return nil
+}

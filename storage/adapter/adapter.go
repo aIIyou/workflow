@@ -59,6 +59,9 @@ type Adapter interface {
 
 	//UpdateEventHeartbeat updates the heartbeat timestamp for the specified event
 	UpdateEventHeartbeat(ctx context.Context, eventId string) error
+
+	//UpdateEventFlowData updates the data field of the specified event flow instance
+	UpdateEventFlowData(ctx context.Context, flowId string, data string) error
 }
 
 func RegisterAdapter(name FrameworkName, adapter Adapter) error {
@@ -135,4 +138,12 @@ func UpdateEventHeartbeat(ctx context.Context, eventId string) error {
 		return err
 	}
 	return adapter.UpdateEventHeartbeat(ctx, eventId)
+}
+
+func UpdateEventFlowData(ctx context.Context, flowId string, data string) error {
+	adapter, err := RetrieveAdapter(framework)
+	if err != nil {
+		return err
+	}
+	return adapter.UpdateEventFlowData(ctx, flowId, data)
 }

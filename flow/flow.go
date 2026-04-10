@@ -502,12 +502,11 @@ func StartEventFlow(ctx context.Context, name string, data any) (flowId string, 
 	startEventName := workflow.startEvent
 
 	//event entity
-	startEvent := &event.Event{
+	startEvent := &model.Event{
 		EventId:  uuid.NewString(),
 		Type:     startEventName,
 		Name:     startEventName,
 		Status:   event.StatusPending,
-		Ctx:      context.Background(),
 		FlowId:   flowId,
 		FlowType: name,
 	}
@@ -521,4 +520,15 @@ func RetrieveContextData(ctx context.Context, flowId string) (data string, err e
 		return "", err
 	}
 	return eventFlowInstance.Data, err
+}
+
+func SetContextData(ctx context.Context, flowId string, data any) error {
+	// 序列化数据为 JSON
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal data: %v", err)
+	}
+
+	// 更新 event_flow 表的数据字段
+	return adapter.UpdateEventFlowData(ctx, flowId, string(jsonData))
 }

@@ -12,6 +12,8 @@ const (
 	UpdateEventHeartbeat = "UPDATE `event_queue` SET `heartbeat_at` = NOW() WHERE `event_id` = ?"
 
 	RetrieveEventFlow = "SELECT * From `event_flow` WHERE `flow_id` = ?"
+
+	UpdateEventFlowData = "UPDATE `event_flow` SET `data` = ? WHERE `flow_id` = ?"
 )
 
 const (
