@@ -13,6 +13,7 @@ type FrameworkName string
 const (
 	GF FrameworkName = "gf"
 	GO FrameworkName = "gorm"
+	UT FrameworkName = "unit_test"
 )
 
 var (
