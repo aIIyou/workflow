@@ -3,12 +3,11 @@ package adapter
 import (
 	"context"
 	"fmt"
-
-	"github.com/aIIyou/workflow/event"
 	"github.com/aIIyou/workflow/model"
 	"github.com/aIIyou/workflow/storage/mysql"
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
+	"time"
 )
 
 func NewGfAdapter(name string) *GfAdapter {
@@ -50,7 +49,7 @@ func (gfa *GfAdapter) CreateEvent(ctx context.Context, e *model.Event) error {
 		eventId     = e.EventId
 		eventType   = e.Type
 		eventName   = e.Name
-		eventStatus = event.StatusPending
+		eventStatus = "Pending"
 		flowId      = e.FlowId
 		flowType    = e.FlowType
 	)
@@ -131,7 +130,7 @@ func (gfa *GfAdapter) RetrieveFlowPendingEvent(ctx context.Context, flowId strin
 			return nil, fmt.Errorf("commit failed: %w", commitErr)
 		}
 	}
-	events[0].Status = event.StatusProcessing
+	events[0].Status = "Processing"
 	return events[0], nil
 }
 
@@ -155,6 +154,33 @@ func (gfa *GfAdapter) UpdateEventHeartbeat(ctx context.Context, eventId string) 
 	_, err := g.DB(gfa.group).Exec(ctx, mysql.UpdateEventHeartbeat, eventId)
 	if err != nil {
 		return fmt.Errorf("failed to update event heartbeat: %v", err)
+	}
+	return nil
+}
+
+func (gfa *GfAdapter) RetrieveFlowCurrentEvent(ctx context.Context, flowId string) (*model.Event, error) {
+	result, err := g.DB(gfa.group).Query(ctx, mysql.RetrieveFlowCurrentEvent, flowId)
+	if err != nil {
+		return nil, err
+	}
+
+	if result.Len() <= 0 {
+		return nil, nil
+	}
+
+	events := make([]*model.Event, 0)
+	err = result.Structs(&events)
+	if err != nil {
+		return nil, err
+	}
+
+	return events[0], nil
+}
+
+func (gfa *GfAdapter) UpdateEventVisibleAt(ctx context.Context, eventId string, visibleAt time.Time) error {
+	_, err := g.DB(gfa.group).Exec(ctx, mysql.UpdateEventVisibleAt, visibleAt, eventId)
+	if err != nil {
+		return fmt.Errorf("failed to update event visible_at: %v", err)
 	}
 	return nil
 }

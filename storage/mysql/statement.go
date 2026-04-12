@@ -14,6 +14,10 @@ const (
 	RetrieveEventFlow = "SELECT * From `event_flow` WHERE `flow_id` = ?"
 
 	UpdateEventFlowData = "UPDATE `event_flow` SET `data` = ? WHERE `flow_id` = ?"
+
+	RetrieveFlowCurrentEvent = "SELECT * FROM `event_queue` WHERE `flow_id` = ? ORDER BY `created_at` DESC LIMIT 1"
+
+	UpdateEventVisibleAt = "UPDATE `event_queue` SET `visible_at` = ? WHERE `event_id` = ?"
 )
 
 const (

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/aIIyou/workflow/model"
 )
@@ -55,11 +56,18 @@ type Adapter interface {
 	//!!!
 	RetrieveFlowPendingEvent(ctx context.Context, flowId string) (*model.Event, error)
 
+	//RetrieveFlowCurrentEvent retrieves the current event from the specified flow
+	//This method returns the current event in the flow regardless of its status
+	RetrieveFlowCurrentEvent(ctx context.Context, flowId string) (*model.Event, error)
+
 	//RetrieveEventFlowInstance retrieves the event flow which flow_id equals @flowId
 	RetrieveEventFlowInstance(ctx context.Context, flowId string) (*model.EventFlowInstance, error)
 
 	//UpdateEventHeartbeat updates the heartbeat timestamp for the specified event
 	UpdateEventHeartbeat(ctx context.Context, eventId string) error
+
+	//UpdateEventVisibleAt updates the visible_at timestamp for the specified event
+	UpdateEventVisibleAt(ctx context.Context, eventId string, visibleAt time.Time) error
 
 	//UpdateEventFlowData updates the data field of the specified event flow instance
 	UpdateEventFlowData(ctx context.Context, flowId string, data string) error
@@ -133,12 +141,28 @@ func RetrieveEventFlowInstance(ctx context.Context, flowId string) (*model.Event
 	return adapter.RetrieveEventFlowInstance(ctx, flowId)
 }
 
+func RetrieveFlowCurrentEvent(ctx context.Context, flowId string) (*model.Event, error) {
+	adapter, err := RetrieveAdapter(framework)
+	if err != nil {
+		return nil, err
+	}
+	return adapter.RetrieveFlowCurrentEvent(ctx, flowId)
+}
+
 func UpdateEventHeartbeat(ctx context.Context, eventId string) error {
 	adapter, err := RetrieveAdapter(framework)
 	if err != nil {
 		return err
 	}
 	return adapter.UpdateEventHeartbeat(ctx, eventId)
+}
+
+func UpdateEventVisibleAt(ctx context.Context, eventId string, visibleAt time.Time) error {
+	adapter, err := RetrieveAdapter(framework)
+	if err != nil {
+		return err
+	}
+	return adapter.UpdateEventVisibleAt(ctx, eventId, visibleAt)
 }
 
 func UpdateEventFlowData(ctx context.Context, flowId string, data string) error {

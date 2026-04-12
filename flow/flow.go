@@ -423,7 +423,32 @@ func (flow *Flow) NextEvent(event *event.Event) (string, *time.Time, error) {
 }
 
 func (flow *Flow) NextEventManual(ctx context.Context, flowId string) (*event.Event, *time.Time, error) {
-	return nil, nil, nil
+	// 获取当前事件
+	eventModel, err := adapter.RetrieveFlowCurrentEvent(ctx, flowId)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to retrieve event: %v", err)
+	}
+	if eventModel == nil {
+		return nil, nil, fmt.Errorf("no event found for flow %s", flowId)
+	}
+
+	// 更新数据库中的visible_at字段为当前时间
+	now := time.Now()
+	err = adapter.UpdateEventVisibleAt(ctx, eventModel.EventId, now)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to update event visible_at: %v", err)
+	}
+
+	// 转换为event.Event类型并返回
+	event := event.NewFromModel(eventModel)
+	if event == nil {
+		return nil, nil, fmt.Errorf("failed to convert model to event")
+	}
+
+	// 设置visible_at字段
+	event.VisibleAt = &now
+
+	return event, &now, nil
 }
 
 func (flow *Flow) IsAsync(eventName string) bool {
@@ -626,5 +651,18 @@ func SetContextData(ctx context.Context, flowId string, data any) error {
 }
 
 func ExecuteEventFlow(ctx context.Context, flowId string) error {
+	eventFlowInstance, err := adapter.RetrieveEventFlowInstance(ctx, flowId)
+	if err != nil {
+		return err
+	}
+	eventFlowName := eventFlowInstance.Name
+	eventFlow, err := RetrieveEventflow(eventFlowName)
+	if err != nil {
+		return err
+	}
+	_, _, err = eventFlow.NextEventManual(ctx, flowId)
+	if err != nil {
+		return err
+	}
 	return nil
 }
