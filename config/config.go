@@ -51,9 +51,11 @@ func GetConfigPath() string {
 
 func GetConfigure() *Configuration {
 	globalConfigureMutex.RLock()
-	defer globalConfigureMutex.RUnlock()
 	if globalConfigure == nil {
+		globalConfigureMutex.RUnlock()
 		parseConfigFile()
+	} else {
+		globalConfigureMutex.RUnlock()
 	}
 	return globalConfigure
 }
