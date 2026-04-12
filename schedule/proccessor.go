@@ -116,7 +116,28 @@ func (p *defaultProcessor) processAsyncPendingEvent(ctx context.Context, e *even
 		return err
 	}
 
-	//TODO 这里要交给EventFlow去流转了
+	eventFlow, err := flow.RetrieveEventflow(e.FlowName)
+	if err != nil {
+		return err
+	}
+	nextEventName, visibleAt, err := eventFlow.NextEvent(e)
+	if err != nil {
+		return err
+	}
+
+	err = event.StartNewEvent(ctx, &event.Event{
+		Type:      nextEventName,
+		Name:      nextEventName,
+		Async:     eventFlow.IsAsync(nextEventName),
+		FlowId:    e.FlowId,
+		FlowType:  e.FlowType,
+		FlowName:  e.FlowName,
+		VisibleAt: visibleAt,
+	})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

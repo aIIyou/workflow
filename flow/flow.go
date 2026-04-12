@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/aIIyou/workflow/config"
 	"github.com/aIIyou/workflow/event"
@@ -254,7 +255,7 @@ func (t *Transition) Evaluate(ctx context.Context) bool {
 	return t.f(ctx)
 }
 
-type FLow struct {
+type Flow struct {
 
 	//_type  event flow type.
 	_type string
@@ -264,6 +265,8 @@ type FLow struct {
 
 	//events contained by event flow.
 	events []string
+
+	eventMap map[string]bool
 
 	//first event of event flow.
 	startEvent string
@@ -278,8 +281,8 @@ type FLow struct {
 }
 
 // NewEventFlow 创建一个新的事件流实例
-func NewEventFlow(flowType, name string, events []string, transitions []Transition) *FLow {
-	flow := &FLow{
+func NewEventFlow(flowType, name string, events []string, transitions []Transition) *Flow {
+	flow := &Flow{
 		_type:       flowType,
 		name:        name,
 		mu:          new(sync.RWMutex),
@@ -295,21 +298,21 @@ func NewEventFlow(flowType, name string, events []string, transitions []Transiti
 	return flow
 }
 
-func (flow *FLow) Name() string {
+func (flow *Flow) Name() string {
 	flow.mu.RLock()
 	defer flow.mu.RUnlock()
 	name := flow.name
 	return name
 }
 
-func (flow *FLow) Type() string {
+func (flow *Flow) Type() string {
 	flow.mu.RLock()
 	defer flow.mu.RUnlock()
 	_type := flow._type
 	return _type
 }
 
-func (flow *FLow) AddEvents(events []string) *FLow {
+func (flow *Flow) AddEvents(events []string) *Flow {
 	flow.mu.Lock()
 	defer flow.mu.Unlock()
 	if flow.events == nil {
@@ -319,7 +322,7 @@ func (flow *FLow) AddEvents(events []string) *FLow {
 	return flow
 }
 
-func (flow *FLow) AddTransitions(transitions []config.Transition) *FLow {
+func (flow *Flow) AddTransitions(transitions []config.Transition) *Flow {
 	flow.mu.Lock()
 	defer flow.mu.Unlock()
 	if flow.transitions == nil {
@@ -338,15 +341,15 @@ func (flow *FLow) AddTransitions(transitions []config.Transition) *FLow {
 	return flow
 }
 
-func (flow *FLow) NextEvent(event *event.Event) (string, error) {
+func (flow *Flow) NextEvent(event *event.Event) (string, *time.Time, error) {
 	if event == nil {
-		return "", fmt.Errorf("event is nil")
+		return "", nil, fmt.Errorf("event is nil")
 	}
 
 	// 获取流程实例数据
 	flowInstance, err := adapter.RetrieveEventFlowInstance(event.Ctx, event.FlowId)
 	if err != nil {
-		return "", fmt.Errorf("failed to retrieve event flow instance: %v", err)
+		return "", nil, fmt.Errorf("failed to retrieve event flow instance: %v", err)
 	}
 
 	// 获取当前事件名称
@@ -358,14 +361,14 @@ func (flow *FLow) NextEvent(event *event.Event) (string, error) {
 	flow.mu.RUnlock()
 
 	if !exists || len(transitions) == 0 {
-		return "", fmt.Errorf("no transitions found for event: %s", currentEventName)
+		return "", nil, fmt.Errorf("no transitions found for event: %s", currentEventName)
 	}
 
 	// 将流程数据从字符串反序列化为 map 格式
 	var controlData map[string]interface{}
 	if flowInstance.Data != "" {
 		if err := json.Unmarshal([]byte(flowInstance.Data), &controlData); err != nil {
-			return "", fmt.Errorf("failed to unmarshal flow data: %v", err)
+			return "", nil, fmt.Errorf("failed to unmarshal flow data: %v", err)
 		}
 	} else {
 		controlData = make(map[string]interface{})
@@ -374,22 +377,59 @@ func (flow *FLow) NextEvent(event *event.Event) (string, error) {
 	// 创建包含流程数据的上下文
 	ctx := context.WithValue(event.Ctx, KeyControlData, controlData)
 
-	// 遍历所有转换规则，找到第一个满足条件的
-	for _, transition := range transitions {
-		if transition.Evaluate(ctx) {
-			return transition.GetToEvent(), nil
+	// 根据execute_type设置visible_at逻辑
+	var visibleAt *time.Time
+
+	// 从controlData中获取execute_type
+	executeType, _ := controlData["execute_type"].(string)
+
+	switch executeType {
+	case "auto":
+		// visible_at等于当前时间
+		now := time.Now()
+		visibleAt = &now
+
+	case "timed":
+		// 从execute_time字段获取时间
+		if executeTimeStr, ok := controlData["execute_time"].(string); ok {
+			if executeTime, err := time.Parse(time.RFC3339, executeTimeStr); err == nil {
+				visibleAt = &executeTime
+			}
+		}
+
+	case "manual":
+		// 将事件标记为同步 - 这里不需要设置visible_at，因为同步事件立即执行
+		// 可以通过IsAsync方法来处理同步逻辑
+		visibleAt = nil
+
+	default:
+		// 默认情况下，如果事件是异步的，设置visible_at为当前时间
+		if flow.IsAsync(currentEventName) {
+			now := time.Now()
+			visibleAt = &now
 		}
 	}
 
-	return "", fmt.Errorf("no valid transition found for event: %s with current data", currentEventName)
+	// 遍历所有转换规则，找到第一个满足条件的
+	for _, transition := range transitions {
+		if transition.Evaluate(ctx) {
+			return transition.GetToEvent(), visibleAt, nil
+		}
+	}
+
+	return "", nil, fmt.Errorf("no valid transition found for event: %s with current data", currentEventName)
 }
 
-func (flow *FLow) Handler() any {
+func (flow *Flow) IsAsync(eventName string) bool {
+	return flow.eventMap[eventName]
+}
+
+func (flow *Flow) Handler() any {
 	return flow.handler
 }
 
 var (
-	globalWorkflow      map[string]*FLow
+	globalWorkflow      map[string]*Flow
 	globalWorkflowMutex sync.RWMutex
 )
 
@@ -398,7 +438,7 @@ func RegisterEventflow(name string, handler any, conf *config.Configuration) err
 	globalWorkflowMutex.Lock()
 	defer globalWorkflowMutex.Unlock()
 	if globalWorkflow == nil {
-		globalWorkflow = make(map[string]*FLow)
+		globalWorkflow = make(map[string]*Flow)
 	}
 	if _, existed := globalWorkflow[name]; existed {
 		return fmt.Errorf(`workflow "%s" already registered`, name)
@@ -414,17 +454,20 @@ func RegisterEventflow(name string, handler any, conf *config.Configuration) err
 			continue
 		}
 		eventNames := make([]string, len(flowConfig.Event))
+		eventMap := make(map[string]bool)
 		for i, eventConfig := range flowConfig.Event {
 			eventNames[i] = eventConfig.Name
+			eventMap[eventConfig.Name] = eventConfig.Async
 		}
 
 		if err := validateHandler(handler, eventNames); err != nil {
 			return err
 		}
-		flow := &FLow{
+		flow := &Flow{
 			_type:      name,
 			name:       name,
 			events:     eventNames,
+			eventMap:   eventMap,
 			startEvent: flowConfig.StartEvent,
 			handler:    handler,
 			mu:         &sync.RWMutex{},
@@ -437,7 +480,7 @@ func RegisterEventflow(name string, handler any, conf *config.Configuration) err
 }
 
 // RetrieveWorkFlow retrieve event flow
-func RetrieveEventflow(name string) (flow *FLow, err error) {
+func RetrieveEventflow(name string) (flow *Flow, err error) {
 	globalWorkflowMutex.RLock()
 	defer globalWorkflowMutex.RUnlock()
 	if flow, existed := globalWorkflow[name]; existed {
