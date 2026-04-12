@@ -376,7 +376,7 @@ func (flow *FLow) NextEvent(event *event.Event) (string, error) {
 
 	// 遍历所有转换规则，找到第一个满足条件的
 	for _, transition := range transitions {
-		if transition.Evaluate(ctx) {
+		if transition.GetFromEvent() == event.Name && transition.Evaluate(ctx) {
 			return transition.GetToEvent(), nil
 		}
 	}
