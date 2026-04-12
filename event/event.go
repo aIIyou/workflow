@@ -2,8 +2,10 @@ package event
 
 import (
 	"context"
+	"time"
 
 	"github.com/aIIyou/workflow/model"
+	"github.com/aIIyou/workflow/storage/adapter"
 	"github.com/google/uuid"
 )
 
@@ -47,6 +49,8 @@ type Event struct {
 
 	//FlowName is the workflow name
 	FlowName string
+
+	VisibleAt *time.Time
 }
 
 func NewFromModel(event *model.Event) *Event {
@@ -63,6 +67,30 @@ func NewEvent(eventType, name string, async bool, handler func(ctx context.Conte
 		Name:    name,
 		Handler: handler,
 	}
+}
+
+func StartNewEvent(ctx context.Context, e *Event) error {
+	modelEvent := &model.Event{
+		EventId:     uuid.NewString(),
+		Type:        e.Type,
+		Async:       e.Async,
+		Name:        e.Name,
+		Status:      "Pending",
+		FlowId:      e.FlowId,
+		FlowType:    e.FlowType,
+		FlowName:    e.FlowName,
+		CreateAt:    nil,
+		UpdateAt:    nil,
+		HeartBeatAt: nil,
+		VisibleAt:   e.VisibleAt,
+		WorkerIP:    "",
+		WorkerId:    "",
+	}
+	err := adapter.CreateEvent(ctx, modelEvent)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // SetId set event id
