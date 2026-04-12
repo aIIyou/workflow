@@ -12,6 +12,7 @@ import (
 
 	"github.com/aIIyou/workflow/config"
 	"github.com/aIIyou/workflow/event"
+	"github.com/aIIyou/workflow/model"
 	"github.com/aIIyou/workflow/storage/adapter"
 	"github.com/google/uuid"
 )
@@ -187,7 +188,7 @@ func NewTransition(fromEvent, toEvent, expr string) Transition {
 	exprFunc := parseExpression(expr)
 
 	tran.f = func(ctx context.Context) bool {
-		businessData := ctx.Value(KeyBusinessData)
+		businessData := ctx.Value(KeyControlData)
 		if businessData == nil {
 			return false
 		}
@@ -337,8 +338,50 @@ func (flow *FLow) AddTransitions(transitions []config.Transition) *FLow {
 	return flow
 }
 
-func (flow *FLow) NextEvent(event *event.Event) error {
-	return nil
+func (flow *FLow) NextEvent(event *event.Event) (string, error) {
+	if event == nil {
+		return "", fmt.Errorf("event is nil")
+	}
+
+	// 获取流程实例数据
+	flowInstance, err := adapter.RetrieveEventFlowInstance(event.Ctx, event.FlowId)
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve event flow instance: %v", err)
+	}
+
+	// 获取当前事件名称
+	currentEventName := event.Name
+
+	// 查找当前事件的所有转换规则
+	flow.mu.RLock()
+	transitions, exists := flow.transitions[currentEventName]
+	flow.mu.RUnlock()
+
+	if !exists || len(transitions) == 0 {
+		return "", fmt.Errorf("no transitions found for event: %s", currentEventName)
+	}
+
+	// 将流程数据从字符串反序列化为 map 格式
+	var controlData map[string]interface{}
+	if flowInstance.Data != "" {
+		if err := json.Unmarshal([]byte(flowInstance.Data), &controlData); err != nil {
+			return "", fmt.Errorf("failed to unmarshal flow data: %v", err)
+		}
+	} else {
+		controlData = make(map[string]interface{})
+	}
+
+	// 创建包含流程数据的上下文
+	ctx := context.WithValue(event.Ctx, KeyControlData, controlData)
+
+	// 遍历所有转换规则，找到第一个满足条件的
+	for _, transition := range transitions {
+		if transition.Evaluate(ctx) {
+			return transition.GetToEvent(), nil
+		}
+	}
+
+	return "", fmt.Errorf("no valid transition found for event: %s with current data", currentEventName)
 }
 
 func (flow *FLow) Handler() any {
