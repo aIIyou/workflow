@@ -9,9 +9,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/aIIyou/workflow/config"
 	"github.com/aIIyou/workflow/event"
+	"github.com/aIIyou/workflow/model"
 	"github.com/aIIyou/workflow/storage/adapter"
 	"github.com/google/uuid"
 )
@@ -187,7 +189,7 @@ func NewTransition(fromEvent, toEvent, expr string) Transition {
 	exprFunc := parseExpression(expr)
 
 	tran.f = func(ctx context.Context) bool {
-		businessData := ctx.Value(KeyBusinessData)
+		businessData := ctx.Value(KeyControlData)
 		if businessData == nil {
 			return false
 		}
@@ -253,7 +255,7 @@ func (t *Transition) Evaluate(ctx context.Context) bool {
 	return t.f(ctx)
 }
 
-type EventFlow struct {
+type Flow struct {
 
 	//_type  event flow type.
 	_type string
@@ -263,6 +265,8 @@ type EventFlow struct {
 
 	//events contained by event flow.
 	events []string
+
+	eventMap map[string]bool
 
 	//first event of event flow.
 	startEvent string
@@ -277,8 +281,8 @@ type EventFlow struct {
 }
 
 // NewEventFlow 创建一个新的事件流实例
-func NewEventFlow(flowType, name string, events []string, transitions []Transition) *EventFlow {
-	flow := &EventFlow{
+func NewEventFlow(flowType, name string, events []string, transitions []Transition) *Flow {
+	flow := &Flow{
 		_type:       flowType,
 		name:        name,
 		mu:          new(sync.RWMutex),
@@ -294,21 +298,21 @@ func NewEventFlow(flowType, name string, events []string, transitions []Transiti
 	return flow
 }
 
-func (flow *EventFlow) Name() string {
+func (flow *Flow) Name() string {
 	flow.mu.RLock()
 	defer flow.mu.RUnlock()
 	name := flow.name
 	return name
 }
 
-func (flow *EventFlow) Type() string {
+func (flow *Flow) Type() string {
 	flow.mu.RLock()
 	defer flow.mu.RUnlock()
 	_type := flow._type
 	return _type
 }
 
-func (flow *EventFlow) AddEvents(events []string) *EventFlow {
+func (flow *Flow) AddEvents(events []string) *Flow {
 	flow.mu.Lock()
 	defer flow.mu.Unlock()
 	if flow.events == nil {
@@ -318,7 +322,7 @@ func (flow *EventFlow) AddEvents(events []string) *EventFlow {
 	return flow
 }
 
-func (flow *EventFlow) AddTransitions(transitions []config.Transition) *EventFlow {
+func (flow *Flow) AddTransitions(transitions []config.Transition) *Flow {
 	flow.mu.Lock()
 	defer flow.mu.Unlock()
 	if flow.transitions == nil {
@@ -337,21 +341,135 @@ func (flow *EventFlow) AddTransitions(transitions []config.Transition) *EventFlo
 	return flow
 }
 
-func (flow *EventFlow) NextEvent(event *event.Event) string {
-	return ""
+func (flow *Flow) NextEvent(event *event.Event) (string, *time.Time, error) {
+	if event == nil {
+		return "", nil, fmt.Errorf("event is nil")
+	}
+
+	// 获取流程实例数据
+	flowInstance, err := adapter.RetrieveEventFlowInstance(event.Ctx, event.FlowId)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to retrieve event flow instance: %v", err)
+	}
+
+	// 获取当前事件名称
+	currentEventName := event.Name
+
+	// 查找当前事件的所有转换规则
+	flow.mu.RLock()
+	transitions, exists := flow.transitions[currentEventName]
+	flow.mu.RUnlock()
+
+	if !exists || len(transitions) == 0 {
+		return "", nil, fmt.Errorf("no transitions found for event: %s", currentEventName)
+	}
+
+	// 将流程数据从字符串反序列化为 map 格式
+	var controlData map[string]interface{}
+	if flowInstance.Data != "" {
+		if err := json.Unmarshal([]byte(flowInstance.Data), &controlData); err != nil {
+			return "", nil, fmt.Errorf("failed to unmarshal flow data: %v", err)
+		}
+	} else {
+		controlData = make(map[string]interface{})
+	}
+
+	// 创建包含流程数据的上下文
+	ctx := context.WithValue(event.Ctx, KeyControlData, controlData)
+
+	// 根据execute_type设置visible_at逻辑
+	var visibleAt *time.Time
+
+	// 从controlData中获取execute_type
+	executeType, _ := controlData["execute_type"].(string)
+
+	switch executeType {
+	case "auto":
+		// visible_at等于当前时间
+		now := time.Now()
+		visibleAt = &now
+
+	case "timed":
+		// 从execute_time字段获取时间
+		if executeTimeStr, ok := controlData["execute_time"].(string); ok {
+			if executeTime, err := time.Parse(time.RFC3339, executeTimeStr); err == nil {
+				visibleAt = &executeTime
+			}
+		}
+
+	case "manual":
+		// 将事件标记为同步 - 这里不需要设置visible_at，因为同步事件立即执行
+		// 可以通过IsAsync方法来处理同步逻辑
+		// 使用MySQL timestamp类型的最大值 '2038-01-19 03:14:07'
+		maxTimestamp := time.Date(2038, 1, 19, 3, 14, 7, 0, time.UTC)
+		visibleAt = &maxTimestamp
+
+	default:
+		// 默认情况下，如果事件是异步的，设置visible_at为当前时间
+		if flow.IsAsync(currentEventName) {
+			now := time.Now()
+			visibleAt = &now
+		}
+	}
+
+	// 遍历所有转换规则，找到第一个满足条件的
+	for _, transition := range transitions {
+		if transition.Evaluate(ctx) {
+			return transition.GetToEvent(), visibleAt, nil
+		}
+	}
+
+	return "", nil, fmt.Errorf("no valid transition found for event: %s with current data", currentEventName)
+}
+
+func (flow *Flow) NextEventManual(ctx context.Context, flowId string) (*event.Event, *time.Time, error) {
+	// 获取当前事件
+	eventModel, err := adapter.RetrieveFlowCurrentEvent(ctx, flowId)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to retrieve event: %v", err)
+	}
+	if eventModel == nil {
+		return nil, nil, fmt.Errorf("no event found for flow %s", flowId)
+	}
+
+	// 更新数据库中的visible_at字段为当前时间
+	now := time.Now()
+	err = adapter.UpdateEventVisibleAt(ctx, eventModel.EventId, now)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to update event visible_at: %v", err)
+	}
+
+	// 转换为event.Event类型并返回
+	event := event.NewFromModel(eventModel)
+	if event == nil {
+		return nil, nil, fmt.Errorf("failed to convert model to event")
+	}
+
+	// 设置visible_at字段
+	event.VisibleAt = &now
+
+	return event, &now, nil
+}
+
+func (flow *Flow) IsAsync(eventName string) bool {
+	return flow.eventMap[eventName]
+}
+
+func (flow *Flow) Handler() any {
+	return flow.handler
 }
 
 var (
-	globalWorkflow      map[string]*EventFlow
+	globalWorkflow      map[string]*Flow
 	globalWorkflowMutex sync.RWMutex
 )
 
-// RegisterWorkflow register workflow
-func RegisterWorkflow(name string, handler any, conf *config.Configuration) error {
+// RegisterWorkflow register event flow
+func RegisterEventflow(name string, handler any, conf *config.Configuration) error {
 	globalWorkflowMutex.Lock()
 	defer globalWorkflowMutex.Unlock()
 	if globalWorkflow == nil {
-		globalWorkflow = make(map[string]*EventFlow)
+		globalWorkflow = make(map[string]*Flow)
 	}
 	if _, existed := globalWorkflow[name]; existed {
 		return fmt.Errorf(`workflow "%s" already registered`, name)
@@ -362,17 +480,25 @@ func RegisterWorkflow(name string, handler any, conf *config.Configuration) erro
 	if conf == nil {
 		return fmt.Errorf("configure is nil")
 	}
-	for _, flowConfig := range conf.Flows {
+	for _, flowConfig := range conf.Flow {
 		if flowConfig.FlowName != name {
 			continue
 		}
-		if err := validateHandler(handler, flowConfig.EventsName); err != nil {
+		eventNames := make([]string, len(flowConfig.Event))
+		eventMap := make(map[string]bool)
+		for i, eventConfig := range flowConfig.Event {
+			eventNames[i] = eventConfig.Name
+			eventMap[eventConfig.Name] = eventConfig.Async
+		}
+
+		if err := validateHandler(handler, eventNames); err != nil {
 			return err
 		}
-		flow := &EventFlow{
+		flow := &Flow{
 			_type:      name,
 			name:       name,
-			events:     flowConfig.EventsName,
+			events:     eventNames,
+			eventMap:   eventMap,
 			startEvent: flowConfig.StartEvent,
 			handler:    handler,
 			mu:         &sync.RWMutex{},
@@ -382,6 +508,16 @@ func RegisterWorkflow(name string, handler any, conf *config.Configuration) erro
 		return nil
 	}
 	return fmt.Errorf(`workflow "%s" not configured`, name)
+}
+
+// RetrieveWorkFlow retrieve event flow
+func RetrieveEventflow(name string) (flow *Flow, err error) {
+	globalWorkflowMutex.RLock()
+	defer globalWorkflowMutex.RUnlock()
+	if flow, existed := globalWorkflow[name]; existed {
+		return flow, nil
+	}
+	return nil, fmt.Errorf(`workflow "%s" not exists`, name)
 }
 
 func validateHandler(handler any, eventsName []string) error {
@@ -483,15 +619,50 @@ func StartEventFlow(ctx context.Context, name string, data any) (flowId string, 
 	startEventName := workflow.startEvent
 
 	//event entity
-	startEvent := &event.Event{
-		Id:       uuid.NewString(),
+	startEvent := &model.Event{
+		EventId:  uuid.NewString(),
 		Type:     startEventName,
 		Name:     startEventName,
 		Status:   event.StatusPending,
-		Ctx:      context.Background(),
 		FlowId:   flowId,
 		FlowType: name,
 	}
 	err = adapter.CreateEvent(ctx, startEvent)
 	return flowId, err
+}
+
+func RetrieveContextData(ctx context.Context, flowId string) (data string, err error) {
+	eventFlowInstance, err := adapter.RetrieveEventFlowInstance(ctx, flowId)
+	if err != nil {
+		return "", err
+	}
+	return eventFlowInstance.Data, err
+}
+
+func SetContextData(ctx context.Context, flowId string, data any) error {
+	// 序列化数据为 JSON
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal data: %v", err)
+	}
+
+	// 更新 event_flow 表的数据字段
+	return adapter.UpdateEventFlowData(ctx, flowId, string(jsonData))
+}
+
+func ExecuteEventFlow(ctx context.Context, flowId string) error {
+	eventFlowInstance, err := adapter.RetrieveEventFlowInstance(ctx, flowId)
+	if err != nil {
+		return err
+	}
+	eventFlowName := eventFlowInstance.Name
+	eventFlow, err := RetrieveEventflow(eventFlowName)
+	if err != nil {
+		return err
+	}
+	_, _, err = eventFlow.NextEventManual(ctx, flowId)
+	if err != nil {
+		return err
+	}
+	return nil
 }

@@ -18,14 +18,14 @@ func Test_parseConfigFile(t *testing.T) {
 			SetConfigPath(tt.fileName)
 			parseConfigFile()
 			config := globalConfigure
-			if config.MaxWorkers != 20 {
+			if config.MaxWorker != 20 {
 				t.Errorf("MaxWorkers not match")
 			}
-			for _, testFlow := range config.Flows {
+			for _, testFlow := range config.Flow {
 				if testFlow.FlowName != "test_flow" {
 					t.Errorf("test_flow name not match")
 				}
-				if len(testFlow.EventsName) != 4 {
+				if len(testFlow.Event) != 4 {
 					t.Errorf("test_flow events not match")
 				}
 				if len(testFlow.Transitions) != 3 {

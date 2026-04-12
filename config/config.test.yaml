@@ -3,16 +3,21 @@ pseudo:
   enabled: true
 
 workflow:
-  max_workers: 20
-  flows:
-    - flow_name: "test_flow"
-      events_name:
-       - "test_event_1"
-       - "test_event_2"
-       - "test_event_3"
-       - "test_event_4"
-      start_event: "test_event_1"
-      transitions:
+  max_worker: 20
+  flow:
+  - flow_name: "test_flow"
+    event:
+      - name: "test_event_1"
+        async: true
+      - name: "test_event_2"
+        async: true
+      - name: "test_event_3"
+        async: true
+      - name: "test_event_4"
+        async: true
+    start_event: "test_event_1"
+    end_event: "test_event_4"
+    transition:
        - from_event: "test_event_1"
          to_event: "test_event_2"
          expr: "event_1_done == true"
