@@ -376,7 +376,7 @@ func (flow *FLow) NextEvent(event *event.Event) (string, error) {
 
 	// 遍历所有转换规则，找到第一个满足条件的
 	for _, transition := range transitions {
-		if transition.GetFromEvent() == event.Name && transition.Evaluate(ctx) {
+		if transition.Evaluate(ctx) {
 			return transition.GetToEvent(), nil
 		}
 	}
@@ -393,8 +393,8 @@ var (
 	globalWorkflowMutex sync.RWMutex
 )
 
-// RegisterWorkflow register workflow
-func RegisterWorkflow(name string, handler any, conf *config.Configuration) error {
+// RegisterWorkflow register event flow
+func RegisterEventflow(name string, handler any, conf *config.Configuration) error {
 	globalWorkflowMutex.Lock()
 	defer globalWorkflowMutex.Unlock()
 	if globalWorkflow == nil {
@@ -436,7 +436,7 @@ func RegisterWorkflow(name string, handler any, conf *config.Configuration) erro
 	return fmt.Errorf(`workflow "%s" not configured`, name)
 }
 
-// RetrieveWorkFlow retrieve workflow
+// RetrieveWorkFlow retrieve event flow
 func RetrieveEventflow(name string) (flow *FLow, err error) {
 	globalWorkflowMutex.RLock()
 	defer globalWorkflowMutex.RUnlock()
