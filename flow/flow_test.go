@@ -2,6 +2,7 @@ package flow
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -139,4 +140,81 @@ func TestFlow_NextEvent(t *testing.T) {
 		t.Log(`pass`)
 	}
 
+}
+
+func TestFlow_isAsync(t *testing.T) {
+	// 创建测试用的flow实例
+	flow := &Flow{
+		_type:  "test-flow",
+		name:   "test-flow",
+		events: []string{"sync-event", "async-event"},
+		eventAsyncMap: map[string]bool{
+			"sync-event":  false,
+			"async-event": true,
+		},
+		mu: &sync.RWMutex{},
+	}
+
+	tests := []struct {
+		name           string
+		eventName      string
+		expectedAsync  bool
+		expectedExists bool
+	}{
+		{
+			name:           "sync event",
+			eventName:      "sync-event",
+			expectedAsync:  false,
+			expectedExists: true,
+		},
+		{
+			name:           "async event",
+			eventName:      "async-event",
+			expectedAsync:  true,
+			expectedExists: true,
+		},
+		{
+			name:           "non-existent event",
+			eventName:      "unknown-event",
+			expectedAsync:  false,
+			expectedExists: false,
+		},
+		{
+			name:           "empty event name",
+			eventName:      "",
+			expectedAsync:  false,
+			expectedExists: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			isAsync := flow.isAsync(tt.eventName)
+
+			if tt.expectedExists {
+				if isAsync != tt.expectedAsync {
+					t.Errorf("Expected async=%v for event '%s', but got %v", tt.expectedAsync, tt.eventName, isAsync)
+				}
+			} else {
+				// 对于不存在的事件，应该返回false
+				if isAsync != false {
+					t.Errorf("Expected false for non-existent event '%s', but got %v", tt.eventName, isAsync)
+				}
+			}
+		})
+	}
+
+	// 测试nil eventAsyncMap的情况
+	flowWithNilMap := &Flow{
+		_type:         "test-flow-nil",
+		name:          "test-flow-nil",
+		events:        []string{"test-event"},
+		eventAsyncMap: nil,
+		mu:            &sync.RWMutex{},
+	}
+
+	isAsync := flowWithNilMap.isAsync("test-event")
+	if isAsync != false {
+		t.Errorf("Expected false for nil eventAsyncMap, but got %v", isAsync)
+	}
 }
