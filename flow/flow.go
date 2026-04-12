@@ -400,7 +400,9 @@ func (flow *Flow) NextEvent(event *event.Event) (string, *time.Time, error) {
 	case "manual":
 		// 将事件标记为同步 - 这里不需要设置visible_at，因为同步事件立即执行
 		// 可以通过IsAsync方法来处理同步逻辑
-		visibleAt = nil
+		// 使用MySQL timestamp类型的最大值 '2038-01-19 03:14:07'
+		maxTimestamp := time.Date(2038, 1, 19, 3, 14, 7, 0, time.UTC)
+		visibleAt = &maxTimestamp
 
 	default:
 		// 默认情况下，如果事件是异步的，设置visible_at为当前时间
@@ -418,6 +420,10 @@ func (flow *Flow) NextEvent(event *event.Event) (string, *time.Time, error) {
 	}
 
 	return "", nil, fmt.Errorf("no valid transition found for event: %s with current data", currentEventName)
+}
+
+func (flow *Flow) NextEventManual(ctx context.Context, flowId string) (*event.Event, *time.Time, error) {
+	return nil, nil, nil
 }
 
 func (flow *Flow) IsAsync(eventName string) bool {
@@ -617,4 +623,8 @@ func SetContextData(ctx context.Context, flowId string, data any) error {
 
 	// 更新 event_flow 表的数据字段
 	return adapter.UpdateEventFlowData(ctx, flowId, string(jsonData))
+}
+
+func ExecuteEventFlow(ctx context.Context, flowId string) error {
+	return nil
 }
