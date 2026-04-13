@@ -3,11 +3,12 @@ package adapter
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/aIIyou/workflow/model"
 	"github.com/aIIyou/workflow/storage/mysql"
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
-	"time"
 )
 
 func NewGfAdapter(name string) *GfAdapter {
@@ -74,8 +75,14 @@ func (gfa *GfAdapter) CreateEvent(ctx context.Context, e *model.Event) error {
 	return nil
 }
 
+// RetrievePendingEvent query an async event whose status is `pending` and update it status to choose
+// using mysql transaction
 func (gfa *GfAdapter) RetrievePendingEvent(ctx context.Context) (*model.Event, error) {
-	result, err := g.DB(gfa.group).Query(ctx, mysql.RetrievePendingEvent)
+	tx, err := g.DB(gfa.group).Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result, err := tx.Query(mysql.RetrievePendingEvent)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +95,21 @@ func (gfa *GfAdapter) RetrievePendingEvent(ctx context.Context) (*model.Event, e
 	if err != nil {
 		return nil, err
 	}
-	return events[0], nil
+
+	pendingEvent := events[0]
+	if _, err = tx.Exec(mysql.UpdateEventStatus, "processing", pendingEvent.EventId); err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+
+	pendingEvent.Status = "choose"
+
+	return pendingEvent, nil
 }
 
 func (gfa *GfAdapter) RetrieveFlowPendingEvent(ctx context.Context, flowId string) (*model.Event, error) {
