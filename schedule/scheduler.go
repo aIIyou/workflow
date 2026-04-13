@@ -151,13 +151,20 @@ func (s *eventScheduler) ExpiredEventLoop(ctx context.Context) {
 	for {
 		if maintain.Load() {
 			time.Sleep(time.Second)
+			continue
 		}
 		if s.curProcessor.Load() >= s.maxProcessor {
 			time.Sleep(time.Second)
+			continue
 		}
 		expiredEvent, err := s.RetrieveExpiredEvent(ctx)
 		if err != nil {
 			time.Sleep(time.Second)
+			continue
+		}
+		if expiredEvent == nil {
+			time.Sleep(time.Second)
+			continue
 		}
 		processor := NewProcessor()
 
