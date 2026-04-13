@@ -54,7 +54,23 @@ type Event struct {
 }
 
 func NewFromModel(event *model.Event) *Event {
-	return nil
+	if event == nil {
+		return nil
+	}
+
+	return &Event{
+		EventId:   event.EventId,
+		Type:      event.Type,
+		Name:      event.Name,
+		Async:     event.Async,
+		Status:    event.Status,
+		Ctx:       nil,
+		Handler:   nil,
+		FlowId:    event.FlowId,
+		FlowType:  event.FlowType,
+		FlowName:  event.FlowName,
+		VisibleAt: event.VisibleAt,
+	}
 }
 
 // NewEvent create a new event
