@@ -112,6 +112,10 @@ func (gfa *GfAdapter) RetrievePendingEvent(ctx context.Context) (*model.Event, e
 	return pendingEvent, nil
 }
 
+func (gfa *GfAdapter) RetrieveExpiredEvent(ctx context.Context) (*model.Event, error) {
+	return nil, nil
+}
+
 func (gfa *GfAdapter) RetrieveFlowPendingEvent(ctx context.Context, flowId string) (*model.Event, error) {
 	var (
 		localTx bool
