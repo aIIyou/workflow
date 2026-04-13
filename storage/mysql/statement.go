@@ -7,6 +7,8 @@ const (
 
 	RetrieveFlowPendingEvent = "SELECT * FROM `event_queue` WHERE `flow_id` = ? AND `status` = 'pending' AND `visible_at` <= now()  LIMIT 1 FOR UPDATE"
 
+	UpdateEventStatus = "UPDATE `event_queue` set `status` = ? WHERE `event_id` = ?"
+
 	UpdatePendingEventStatus = "UPDATE `event_queue` set `status` = 'processing' WHERE `flow_id` = ?"
 
 	UpdateEventHeartbeat = "UPDATE `event_queue` SET `heartbeat_at` = NOW() WHERE `event_id` = ?"
