@@ -116,13 +116,20 @@ func (s *eventScheduler) PendingEventLoop(ctx context.Context) {
 	for {
 		if maintain.Load() {
 			time.Sleep(time.Second)
+			continue
 		}
 		if s.curProcessor.Load() >= s.maxProcessor {
 			time.Sleep(time.Second)
+			continue
 		}
 		pendingEvent, err := s.RetrievePendingEvent(ctx)
 		if err != nil {
 			time.Sleep(time.Second)
+			continue
+		}
+		if pendingEvent == nil {
+			time.Sleep(time.Second)
+			continue
 		}
 		processor := NewProcessor()
 
