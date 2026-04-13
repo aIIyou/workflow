@@ -179,7 +179,7 @@ func (p *defaultProcessor) Process(ctx context.Context, e *event.Event) {
 
 	// 执行事件处理
 	var result error
-	if e.Async && e.Status == event.StatusPending {
+	if e.Async && e.Status == event.StatusProcessing {
 		result = p.processAsyncPendingEvent(ctx, e)
 	} else if !e.Async && e.Status == event.StatusPending {
 		result = p.processSyncPendingEvent(ctx, e)
