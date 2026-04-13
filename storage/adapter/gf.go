@@ -49,12 +49,14 @@ func (gfa *GfAdapter) CreateEvent(ctx context.Context, e *model.Event) error {
 	var (
 		eventId     = e.EventId
 		eventType   = e.Type
+		async       = e.Async
 		eventName   = e.Name
 		eventStatus = "Pending"
 		flowId      = e.FlowId
 		flowType    = e.FlowType
+		flowName    = e.FlowName
 	)
-	_, err = tx.Exec(mysql.CreateEvent, eventId, eventType, eventName, eventStatus, flowId, flowType)
+	_, err = tx.Exec(mysql.CreateEvent, eventId, eventType, async, eventName, eventStatus, flowId, flowType, flowName)
 	if err != nil {
 
 		// if start transaction locally,must commit or rollback
