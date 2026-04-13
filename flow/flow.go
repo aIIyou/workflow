@@ -381,6 +381,9 @@ func (flow *Flow) NextEvent(event *event.Event) (string, *time.Time, error) {
 	var visibleAt *time.Time
 
 	// 从controlData中获取execute_type
+	if _, existed := controlData["execute_type"]; !existed {
+		controlData["execute_type"] = "auto"
+	}
 	executeType, _ := controlData["execute_type"].(string)
 
 	switch executeType {
