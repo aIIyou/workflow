@@ -1,7 +1,7 @@
 package mysql
 
 const (
-	CreateEvent = "INSERT INTO `event_queue`(`event_id`,`type`,`async`,`name`,`status`,`flow_id`,`flow_type`,`flow_name`)VALUES(?,?,?,?,?,?,?,?)"
+	CreateEvent = "INSERT INTO `event_queue`(`event_id`,`type`,`async`,`name`,`status`,`flow_id`,`flow_type`,`flow_name`,`visible_at`)VALUES(?,?,?,?,?,?,?,?,?)"
 
 	RetrievePendingEvent = "SELECT * FROM `event_queue` WHERE `status` = 'pending' AND `async` = true LIMIT 1 FOR UPDATE"
 
