@@ -156,6 +156,10 @@ func (gfa *GfAdapter) RetrievePendingEvent(ctx context.Context) (*model.Event, e
 	}
 
 	if result.Len() <= 0 {
+		if err = tx.Commit(); err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
 		return nil, nil
 	}
 	events := make([]*model.Event, 0)
