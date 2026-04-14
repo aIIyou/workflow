@@ -179,7 +179,7 @@ func (gfa *GfAdapter) RetrievePendingEvent(ctx context.Context) (*model.Event, e
 		return nil, err
 	}
 
-	pendingEvent.Status = "choose"
+	pendingEvent.Status = "processing"
 
 	return pendingEvent, nil
 }
