@@ -35,6 +35,7 @@ var (
 )
 
 type Adapter interface {
+	StartEventFlow(ctx context.Context, instance *model.EventFlowInstance, event *model.Event) error
 
 	//CreateEvent insert event into table `event_queue`
 	//Canonical adapter must use transaction to make insert and user logic atomic.
@@ -101,6 +102,13 @@ func RetrieveAdapter(name FrameworkName) (Adapter, error) {
 // user can use function SetFrameworkName to specify global default ORM framework
 // note: global default ORM framework can only be specified once
 
+func StartEventFlow(ctx context.Context, instance *model.EventFlowInstance, event *model.Event) error {
+	adapter, err := RetrieveAdapter(framework)
+	if err != nil {
+		return err
+	}
+	return adapter.StartEventFlow(ctx, instance, event)
+}
 func CreateEvent(ctx context.Context, event *model.Event) error {
 	adapter, err := RetrieveAdapter(framework)
 	if err != nil {

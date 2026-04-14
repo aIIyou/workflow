@@ -19,3 +19,8 @@ type Event struct {
 	WorkerIP    string
 	WorkerId    string
 }
+
+const (
+	EventStatusPending    = "pending"
+	EventStatusProcessing = "processing"
+)

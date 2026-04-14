@@ -23,6 +23,65 @@ type GfAdapter struct {
 	group string
 }
 
+func (gfa *GfAdapter) StartEventFlow(ctx context.Context, instance *model.EventFlowInstance, event *model.Event) error {
+
+	// whether to commit or rollback transaction locally
+	localTx := false
+
+	// retrieve transaction manager from ctx
+	// assuming user start a database transaction already
+	// if not, start it locally
+	tx := gdb.TXFromCtx(ctx, gfa.group)
+
+	// user has not started a transaction
+	var err error
+	if tx == nil {
+		localTx = true
+		tx, err = g.DB(gfa.group).Begin(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	// insert event flow into table `event_flow`
+	_, err = tx.Exec(mysql.CreateEventFlow,
+		instance.FlowId, instance.Name, instance.Type, instance.Data, model.FlowStatusPending, instance.CurrentEventName)
+	if err != nil {
+		// if start transaction locally,must commit or rollback
+		if localTx {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				return fmt.Errorf("insert event_flow failed: %w; rollback also failed: %v", err, rollbackErr)
+			}
+			return fmt.Errorf("insert event_flow failed: %v", err)
+		}
+		return fmt.Errorf("insert event_flow failed: %v", err)
+	}
+
+	// insert event into table `event_queue`
+	// note: the status of event is pending
+	_, err = tx.Exec(mysql.CreateEvent,
+		event.EventId, event.Type, event.Async, event.Name, model.EventStatusPending,
+		event.FlowId, event.FlowType, event.FlowName)
+	if err != nil {
+		// if start transaction locally,must commit or rollback
+		if localTx {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				return fmt.Errorf("insert event_queue failed: %w; rollback also failed: %v", err, rollbackErr)
+			}
+			return fmt.Errorf("insert event_queue failed: %v", err)
+		}
+		return fmt.Errorf("insert event_queue failed: %v", err)
+	}
+
+	// if start transaction locally,must commit or rollback
+	if localTx {
+		if commitErr := tx.Commit(); commitErr != nil {
+			return fmt.Errorf("commit failed: %v", commitErr)
+		}
+	}
+	return nil
+}
+
 func (gfa *GfAdapter) CreateEvent(ctx context.Context, e *model.Event) error {
 
 	// whether to commit or rollback transaction locally
