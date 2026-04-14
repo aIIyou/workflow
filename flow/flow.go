@@ -636,16 +636,22 @@ func StartEventFlow(ctx context.Context, name string, data any) (flowId string, 
 		CurrentEventName: startEventName,
 	}
 
+	visibleAt, err := RetrieveVisibleAt(data)
+	if err != nil {
+		return "", err
+	}
+
 	//event entity
 	startEvent := &model.Event{
-		EventId:  uuid.NewString(),
-		Name:     startEventName,
-		Type:     startEventName,
-		Async:    workflow.IsAsync(startEventName),
-		Status:   model.EventStatusPending,
-		FlowId:   flowId,
-		FlowType: name,
-		FlowName: name,
+		EventId:   uuid.NewString(),
+		Name:      startEventName,
+		Type:      startEventName,
+		Async:     workflow.IsAsync(startEventName),
+		Status:    model.EventStatusPending,
+		FlowId:    flowId,
+		FlowType:  name,
+		FlowName:  name,
+		VisibleAt: visibleAt,
 	}
 	err = adapter.StartEventFlow(ctx, flowInstance, startEvent)
 	return flowId, err
