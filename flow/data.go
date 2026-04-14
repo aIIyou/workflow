@@ -8,6 +8,9 @@ import (
 )
 
 func RetrieveVisibleAt(data any) (visibleAt *time.Time, err error) {
+	if data == nil {
+		return nil, nil
+	}
 	dataMap, ok := data.(map[string]any)
 	if !ok {
 		return nil, fmt.Errorf(`data is not a map[string]any`)
