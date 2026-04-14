@@ -59,16 +59,9 @@ func (gfa *GfAdapter) StartEventFlow(ctx context.Context, instance *model.EventF
 
 	// insert event into table `event_queue`
 	// note: the status of event is pending
-	// handle nil visible_at by using MySQL NULL value
-	var visibleAt interface{}
-	if event.VisibleAt != nil {
-		visibleAt = event.VisibleAt
-	} else {
-		visibleAt = nil
-	}
 	_, err = tx.Exec(mysql.CreateEvent,
 		event.EventId, event.Type, event.Async, event.Name, model.EventStatusPending,
-		event.FlowId, event.FlowType, event.FlowName, visibleAt)
+		event.FlowId, event.FlowType, event.FlowName, event.VisibleAt)
 	if err != nil {
 		// if start transaction locally,must commit or rollback
 		if localTx {
@@ -156,10 +149,6 @@ func (gfa *GfAdapter) RetrievePendingEvent(ctx context.Context) (*model.Event, e
 	}
 
 	if result.Len() <= 0 {
-		if err = tx.Commit(); err != nil {
-			_ = tx.Rollback()
-			return nil, err
-		}
 		return nil, nil
 	}
 	events := make([]*model.Event, 0)
