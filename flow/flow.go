@@ -610,6 +610,7 @@ func getKeys(m map[string]bool) []string {
 //event workflow control entry
 
 func StartEventFlow(ctx context.Context, name string, data any) (flowId string, err error) {
+
 	globalWorkflowMutex.RLock()
 	defer globalWorkflowMutex.RUnlock()
 	workflow, ok := globalWorkflow[name]
@@ -621,16 +622,32 @@ func StartEventFlow(ctx context.Context, name string, data any) (flowId string, 
 
 	startEventName := workflow.startEvent
 
+	dataBytes, err := json.Marshal(data)
+	if err != nil {
+		return "", err
+	}
+	//flow entity
+	flowInstance := &model.EventFlowInstance{
+		FlowId:           flowId,
+		Name:             name,
+		Type:             name,
+		Data:             string(dataBytes),
+		Status:           model.FlowStatusPending,
+		CurrentEventName: startEventName,
+	}
+
 	//event entity
 	startEvent := &model.Event{
 		EventId:  uuid.NewString(),
-		Type:     startEventName,
 		Name:     startEventName,
-		Status:   event.StatusPending,
+		Type:     startEventName,
+		Async:    workflow.IsAsync(startEventName),
+		Status:   model.EventStatusPending,
 		FlowId:   flowId,
 		FlowType: name,
+		FlowName: name,
 	}
-	err = adapter.CreateEvent(ctx, startEvent)
+	err = adapter.StartEventFlow(ctx, flowInstance, startEvent)
 	return flowId, err
 }
 
