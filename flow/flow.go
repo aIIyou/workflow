@@ -391,6 +391,9 @@ func (flow *Flow) NextEvent(ctx context.Context, event *event.Event) (string, *t
 	var visibleAt *time.Time
 
 	// 从controlData中获取execute_type
+	if controlData == nil {
+		controlData = make(map[string]interface{})
+	}
 	if _, existed := controlData["execute_type"]; !existed {
 		controlData["execute_type"] = "auto"
 	}
