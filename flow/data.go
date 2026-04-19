@@ -9,7 +9,8 @@ import (
 
 func RetrieveVisibleAt(data any) (visibleAt *time.Time, err error) {
 	if data == nil {
-		return nil, nil
+		now := time.Now()
+		return &now, nil
 	}
 	dataMap, ok := data.(map[string]any)
 	if !ok {
