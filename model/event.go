@@ -23,4 +23,5 @@ type Event struct {
 const (
 	EventStatusPending    = "pending"
 	EventStatusProcessing = "processing"
+	EventStatusFinished   = "finished"
 )
