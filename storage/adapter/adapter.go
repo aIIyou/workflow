@@ -72,6 +72,9 @@ type Adapter interface {
 
 	//UpdateEventFlowData updates the data field of the specified event flow instance
 	UpdateEventFlowData(ctx context.Context, flowId string, data string) error
+
+	//UpdateEventStatus updates the status of the specified event
+	UpdateEventStatus(ctx context.Context, eventId string, status string) error
 }
 
 func RegisterAdapter(name FrameworkName, adapter Adapter) error {
@@ -179,4 +182,12 @@ func UpdateEventFlowData(ctx context.Context, flowId string, data string) error 
 		return err
 	}
 	return adapter.UpdateEventFlowData(ctx, flowId, data)
+}
+
+func UpdateEventStatus(ctx context.Context, eventId string, status string) error {
+	adapter, err := RetrieveAdapter(framework)
+	if err != nil {
+		return err
+	}
+	return adapter.UpdateEventStatus(ctx, eventId, status)
 }

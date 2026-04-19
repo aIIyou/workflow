@@ -114,8 +114,9 @@ func (gfa *GfAdapter) CreateEvent(ctx context.Context, e *model.Event) error {
 		flowId      = e.FlowId
 		flowType    = e.FlowType
 		flowName    = e.FlowName
+		visibleAt   = e.VisibleAt
 	)
-	_, err = tx.Exec(mysql.CreateEvent, eventId, eventType, async, eventName, eventStatus, flowId, flowType, flowName)
+	_, err = tx.Exec(mysql.CreateEvent, eventId, eventType, async, eventName, eventStatus, flowId, flowType, flowName, visibleAt)
 	if err != nil {
 
 		// if start transaction locally,must commit or rollback
@@ -145,15 +146,18 @@ func (gfa *GfAdapter) RetrievePendingEvent(ctx context.Context) (*model.Event, e
 	}
 	result, err := tx.Query(mysql.RetrievePendingEvent)
 	if err != nil {
+		_ = tx.Rollback()
 		return nil, err
 	}
 
 	if result.Len() <= 0 {
+		_ = tx.Rollback()
 		return nil, nil
 	}
 	events := make([]*model.Event, 0)
 	err = result.Structs(&events)
 	if err != nil {
+		_ = tx.Rollback()
 		return nil, err
 	}
 
@@ -233,6 +237,9 @@ func (gfa *GfAdapter) RetrieveEventFlowInstance(ctx context.Context, flowId stri
 	if err != nil {
 		return nil, err
 	}
+	if len(eventFlows) == 0 {
+		return nil, fmt.Errorf("no event flow instance found for flowId %s after struct mapping", flowId)
+	}
 	return eventFlows[0], nil
 }
 
@@ -275,6 +282,14 @@ func (gfa *GfAdapter) UpdateEventFlowData(ctx context.Context, flowId string, da
 	_, err := g.DB(gfa.group).Exec(ctx, mysql.UpdateEventFlowData, data, flowId)
 	if err != nil {
 		return fmt.Errorf("failed to update event flow data: %v", err)
+	}
+	return nil
+}
+
+func (gfa *GfAdapter) UpdateEventStatus(ctx context.Context, eventId string, status string) error {
+	_, err := g.DB(gfa.group).Exec(ctx, mysql.UpdateEventStatus, status, eventId)
+	if err != nil {
+		return fmt.Errorf("failed to update event status: %v", err)
 	}
 	return nil
 }
