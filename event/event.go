@@ -2,6 +2,7 @@ package event
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/aIIyou/workflow/model"
@@ -113,6 +114,27 @@ func StartNewEvent(ctx context.Context, e *Event) error {
 func (e *Event) SetId(id string) *Event {
 	e.EventId = id
 	return e
+}
+
+func (e *Event) Finish() error {
+	if e.EventId == "" {
+		return fmt.Errorf("event id is empty")
+	}
+
+	ctx := e.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	err := adapter.UpdateEventStatus(ctx, e.EventId, model.EventStatusFinished)
+	if err != nil {
+		return fmt.Errorf("failed to update event status to finished: %v", err)
+	}
+
+	// 更新本地事件状态
+	e.Status = model.EventStatusFinished
+
+	return nil
 }
 
 // StartEvent is the start pseudo-event which is used to start the event flow and has no actual meaning
