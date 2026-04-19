@@ -271,6 +271,9 @@ type Flow struct {
 	//first event of event flow.
 	startEvent string
 
+	//last event of event flow
+	endEvent string
+
 	//transitions define how to flow from one event to another after it is executed.
 	transitions map[string][]Transition
 
@@ -341,19 +344,26 @@ func (flow *Flow) AddTransitions(transitions []config.Transition) *Flow {
 	return flow
 }
 
-func (flow *Flow) NextEvent(event *event.Event) (string, *time.Time, error) {
+func (flow *Flow) NextEvent(ctx context.Context, event *event.Event) (string, *time.Time, error) {
 	if event == nil {
 		return "", nil, fmt.Errorf("event is nil")
 	}
 
 	// 获取流程实例数据
-	flowInstance, err := adapter.RetrieveEventFlowInstance(event.Ctx, event.FlowId)
+	flowInstance, err := adapter.RetrieveEventFlowInstance(ctx, event.FlowId)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to retrieve event flow instance: %v", err)
 	}
 
 	// 获取当前事件名称
 	currentEventName := event.Name
+
+	//获取终点事件的名称
+	endEventName := flow.endEvent
+
+	if currentEventName == endEventName {
+		return "", nil, nil
+	}
 
 	// 查找当前事件的所有转换规则
 	flow.mu.RLock()
@@ -375,7 +385,7 @@ func (flow *Flow) NextEvent(event *event.Event) (string, *time.Time, error) {
 	}
 
 	// 创建包含流程数据的上下文
-	ctx := context.WithValue(event.Ctx, KeyControlData, controlData)
+	ctx = context.WithValue(ctx, KeyControlData, controlData)
 
 	// 根据execute_type设置visible_at逻辑
 	var visibleAt *time.Time
@@ -503,6 +513,7 @@ func RegisterEventflow(name string, handler any, conf *config.Configuration) err
 			events:     eventNames,
 			eventMap:   eventMap,
 			startEvent: flowConfig.StartEvent,
+			endEvent:   flowConfig.EndEvent,
 			handler:    handler,
 			mu:         &sync.RWMutex{},
 		}
