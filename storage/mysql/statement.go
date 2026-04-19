@@ -5,6 +5,8 @@ const (
 
 	RetrievePendingEvent = "SELECT * FROM `event_queue` WHERE `status` = 'pending' AND `async` = true and `heartbeat_at` IS NULL  LIMIT 1 FOR UPDATE"
 
+	RetrieveExpiredEvent = "SELECT * FROM `event_queue` WHERE `status` = 'processing' AND `async` = true and `heartbeat_at` < ? LIMIT 1 FOR UPDATE"
+
 	RetrieveFlowPendingEvent = "SELECT * FROM `event_queue` WHERE `flow_id` = ? AND `status` = 'pending' AND `visible_at` <= now()  LIMIT 1 FOR UPDATE"
 
 	UpdateEventStatus = "UPDATE `event_queue` set `status` = ? WHERE `event_id` = ?"

@@ -155,7 +155,53 @@ func (p *defaultProcessor) processSyncPendingEvent(ctx context.Context, e *event
 	return nil
 }
 
+func (p *defaultProcessor) executeUserRollbackMethod(ctx context.Context, e *event.Event) error {
+	//TODO 实现这个逻辑
+	return nil
+}
+
 func (p *defaultProcessor) processAsyncExpiredEvent(ctx context.Context, e *event.Event) error {
+
+	err := p.executeUserRollbackMethod(ctx, e)
+
+	if err = e.UpdateStatus(event.StatusProcessing); err != nil {
+		return err
+	}
+	if err = p.executeUserMethod(ctx, e); err != nil {
+		return err
+	}
+
+	eventFlow, err := flow.RetrieveEventflow(e.FlowName)
+	if err != nil {
+		return err
+	}
+
+	if err = e.Finish(); err != nil {
+		return err
+	}
+
+	nextEventName, visibleAt, err := eventFlow.NextEvent(ctx, e)
+	if err != nil {
+		return err
+	}
+	if nextEventName == "" {
+		fmt.Println("end event finished")
+		return nil
+	}
+
+	err = event.StartNewEvent(ctx, &event.Event{
+		Type:      nextEventName,
+		Name:      nextEventName,
+		Async:     eventFlow.IsAsync(nextEventName),
+		FlowId:    e.FlowId,
+		FlowType:  e.FlowType,
+		FlowName:  e.FlowName,
+		VisibleAt: visibleAt,
+	})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -191,9 +237,7 @@ func (p *defaultProcessor) Process(ctx context.Context, e *event.Event) {
 	var result error
 	if e.Async && e.Status == event.StatusProcessing {
 		result = p.processAsyncPendingEvent(ctx, e)
-	} else if !e.Async && e.Status == event.StatusPending {
-		result = p.processSyncPendingEvent(ctx, e)
-	} else if e.Async && e.Status == event.StatusProcessing {
+	} else if e.Async && e.Status == event.StatusExpired {
 		result = p.processAsyncExpiredEvent(ctx, e)
 	}
 

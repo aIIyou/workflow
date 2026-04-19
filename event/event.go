@@ -17,6 +17,7 @@ const (
 	StatusPaused     = "paused"
 	StatusPending    = "pending"
 	StatusProcessing = "processing"
+	StatusExpired    = "expired"
 )
 
 type Event struct {
@@ -135,6 +136,14 @@ func (e *Event) Finish() error {
 	e.Status = model.EventStatusFinished
 
 	return nil
+}
+
+func (e *Event) UpdateStatus(status string) error {
+	ctx := e.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return adapter.UpdateEventStatus(ctx, e.EventId, StatusProcessing)
 }
 
 // StartEvent is the start pseudo-event which is used to start the event flow and has no actual meaning

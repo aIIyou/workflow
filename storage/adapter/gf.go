@@ -178,7 +178,41 @@ func (gfa *GfAdapter) RetrievePendingEvent(ctx context.Context) (*model.Event, e
 }
 
 func (gfa *GfAdapter) RetrieveExpiredEvent(ctx context.Context) (*model.Event, error) {
-	return nil, nil
+	tx, err := g.DB(gfa.group).Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result, err := tx.Query(mysql.RetrieveExpiredEvent, time.Now().Add(-1*time.Minute).Format("2006-01-02 15:04:05"))
+	if err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+
+	if result.Len() <= 0 {
+		_ = tx.Rollback()
+		return nil, nil
+	}
+	events := make([]*model.Event, 0)
+	err = result.Structs(&events)
+	if err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+
+	pendingEvent := events[0]
+	if _, err = tx.Exec(mysql.UpdateEventStatus, "expired", pendingEvent.EventId); err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+
+	pendingEvent.Status = "processing"
+
+	return pendingEvent, nil
 }
 
 func (gfa *GfAdapter) RetrieveFlowPendingEvent(ctx context.Context, flowId string) (*model.Event, error) {
