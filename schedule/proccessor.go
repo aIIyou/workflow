@@ -76,7 +76,8 @@ func (p *defaultProcessor) executeUserMethod(ctx context.Context, e *event.Event
 	}
 
 	// 查找方法
-	method := handlerValue.MethodByName(eventName)
+	methodName := util.Pascal(eventName)
+	method := handlerValue.MethodByName(methodName)
 	if !method.IsValid() {
 		return fmt.Errorf("method %s not found in handler", eventName)
 	}
@@ -120,9 +121,18 @@ func (p *defaultProcessor) processAsyncPendingEvent(ctx context.Context, e *even
 	if err != nil {
 		return err
 	}
-	nextEventName, visibleAt, err := eventFlow.NextEvent(e)
+
+	if err = e.Finish(); err != nil {
+		return err
+	}
+
+	nextEventName, visibleAt, err := eventFlow.NextEvent(ctx, e)
 	if err != nil {
 		return err
+	}
+	if nextEventName == "" {
+		fmt.Println("end event finished")
+		return nil
 	}
 
 	err = event.StartNewEvent(ctx, &event.Event{
