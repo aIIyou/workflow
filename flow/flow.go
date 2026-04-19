@@ -438,33 +438,39 @@ func (flow *Flow) NextEvent(ctx context.Context, event *event.Event) (string, *t
 	return "", nil, fmt.Errorf("no valid transition found for event: %s with current data", currentEventName)
 }
 
-func (flow *Flow) NextEventManual(ctx context.Context, flowId string) (*event.Event, *time.Time, error) {
+func (flow *Flow) NextEventManual(ctx context.Context, flowId string) error {
 	// 获取当前事件
 	eventModel, err := adapter.RetrieveFlowCurrentEvent(ctx, flowId)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to retrieve event: %v", err)
+		return fmt.Errorf("failed to retrieve event: %v", err)
 	}
 	if eventModel == nil {
-		return nil, nil, fmt.Errorf("no event found for flow %s", flowId)
+		return fmt.Errorf("no event found for flow %s", flowId)
 	}
 
-	// 更新数据库中的visible_at字段为当前时间
-	now := time.Now()
-	err = adapter.UpdateEventVisibleAt(ctx, eventModel.EventId, now)
+	if eventModel.Async {
+		return fmt.Errorf(`current event is async event,not allow to execute`)
+	}
+	e := event.NewFromModel(eventModel)
+	nextEventName, visibleAt, err := flow.NextEvent(ctx, e)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to update event visible_at: %v", err)
+		return fmt.Errorf(`query next event failed`)
+	}
+	if nextEventName == "" {
+		return fmt.Errorf(`next event is empty`)
 	}
 
-	// 转换为event.Event类型并返回
-	event := event.NewFromModel(eventModel)
-	if event == nil {
-		return nil, nil, fmt.Errorf("failed to convert model to event")
-	}
+	err = event.StartNewEvent(ctx, &event.Event{
+		Type:      nextEventName,
+		Name:      nextEventName,
+		Async:     flow.IsAsync(nextEventName),
+		FlowId:    e.FlowId,
+		FlowType:  e.FlowType,
+		FlowName:  e.FlowName,
+		VisibleAt: visibleAt,
+	})
 
-	// 设置visible_at字段
-	event.VisibleAt = &now
-
-	return event, &now, nil
+	return err
 }
 
 func (flow *Flow) IsAsync(eventName string) bool {
@@ -700,7 +706,7 @@ func ExecuteEventFlow(ctx context.Context, flowId string) error {
 	if err != nil {
 		return err
 	}
-	_, _, err = eventFlow.NextEventManual(ctx, flowId)
+	err = eventFlow.NextEventManual(ctx, flowId)
 	if err != nil {
 		return err
 	}

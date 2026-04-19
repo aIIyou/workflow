@@ -21,7 +21,7 @@ const (
 
 	UpdateEventFlowData = "UPDATE `event_flow` SET `data` = ? WHERE `flow_id` = ?"
 
-	RetrieveFlowCurrentEvent = "SELECT * FROM `event_queue` WHERE `flow_id` = ? ORDER BY `created_at` DESC LIMIT 1"
+	RetrieveFlowCurrentEvent = "SELECT * FROM `event_queue` WHERE `flow_id` = ? ORDER BY `create_at` DESC LIMIT 1"
 
 	UpdateEventVisibleAt = "UPDATE `event_queue` SET `visible_at` = ? WHERE `event_id` = ?"
 )
