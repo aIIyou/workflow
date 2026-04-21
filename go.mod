@@ -1,16 +1,14 @@
 module github.com/aIIyou/workflow
 
-go 1.25
+go 1.19
 
 require (
-	github.com/go-sql-driver/mysql v1.9.3
 	github.com/gogf/gf/v2 v2.9.8
 	github.com/google/uuid v1.6.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
-	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/clbanning/mxj/v2 v2.7.0 // indirect
 	github.com/emirpasic/gods/v2 v2.0.0-alpha // indirect
