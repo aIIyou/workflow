@@ -677,12 +677,18 @@ func StartEventFlow(ctx context.Context, name string, data any) (flowId string, 
 	return flowId, err
 }
 
-func RetrieveContextData(ctx context.Context, flowId string) (data string, err error) {
+func RetrieveContextData(ctx context.Context, flowId string) (map[string]any, error) {
 	eventFlowInstance, err := adapter.RetrieveEventFlowInstance(ctx, flowId)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return eventFlowInstance.Data, err
+	var data map[string]any
+
+	if err = json.Unmarshal([]byte(eventFlowInstance.Data), &data); err != nil {
+		return nil, err
+	}
+
+	return data, err
 }
 
 func SetContextData(ctx context.Context, flowId string, data any) error {
