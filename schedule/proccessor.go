@@ -95,6 +95,10 @@ func (p *defaultProcessor) executeUserMethod(ctx context.Context, e *event.Event
 	if err := json.Unmarshal([]byte(flowDataStr), &flowData); err != nil {
 		return fmt.Errorf("failed to unmarshal business data: %v", err)
 	}
+	if flowData == nil {
+		flowData = make(map[string]any)
+	}
+	flowData[flow.KeyFlowId] = flowId
 	ctx = context.WithValue(ctx, flow.KeyData, flowData)
 
 	// 调用方法，传入context参数

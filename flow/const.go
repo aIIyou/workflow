@@ -4,4 +4,5 @@ const (
 	KeyData         = "data"
 	KeyBusinessData = "business_data"
 	KeyControlData  = "control_data"
+	KeyFlowId       = "flow_id"
 )
