@@ -686,8 +686,37 @@ func RetrieveContextData(ctx context.Context, flowId string) (data string, err e
 }
 
 func SetContextData(ctx context.Context, flowId string, data any) error {
+	if data == nil {
+		return nil
+	}
+	userMap, ok := data.(map[string]any)
+	if !ok {
+		return fmt.Errorf(`flow only support map type `)
+	}
+
+	flowInstance, err := adapter.RetrieveEventFlowInstance(ctx, flowId)
+	if err != nil {
+		return err
+	}
+	originData := flowInstance.Data
+
+	var originMap map[string]any
+
+	err = json.Unmarshal([]byte(originData), &originMap)
+	if err != nil {
+		return err
+	}
+
+	if originMap == nil {
+		originMap = make(map[string]any)
+	}
+
+	for k, v := range userMap {
+		originMap[k] = v
+	}
+
 	// 序列化数据为 JSON
-	jsonData, err := json.Marshal(data)
+	jsonData, err := json.Marshal(originMap)
 	if err != nil {
 		return fmt.Errorf("failed to marshal data: %v", err)
 	}
