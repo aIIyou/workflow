@@ -327,3 +327,11 @@ func (gfa *GfAdapter) UpdateEventStatus(ctx context.Context, eventId string, sta
 	}
 	return nil
 }
+
+func (gfa *GfAdapter) UpdateFlowStatus(ctx context.Context, status string, flowId string) error {
+	_, err := g.DB(gfa.group).Exec(ctx, mysql.UpdateFlowStatus, status, flowId)
+	if err != nil {
+		return fmt.Errorf("failed to update flow status: %v", err)
+	}
+	return nil
+}

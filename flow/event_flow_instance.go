@@ -50,3 +50,11 @@ func (flow *EventFlowInstance) RetrieveEventFlowInstance(ctx context.Context, fl
 	}
 	return flow.NewFromModel(eventFlowInstance), nil
 }
+
+func (flow *EventFlowInstance) UpdateStatus(ctx context.Context, status string) error {
+	a, err := adapter.RetrieveAdapter(adapter.GF)
+	if err != nil {
+		return err
+	}
+	return a.UpdateFlowStatus(ctx, flow.FlowId, status)
+}

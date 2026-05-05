@@ -6,3 +6,7 @@ const (
 	KeyControlData  = "control_data"
 	KeyFlowId       = "flow_id"
 )
+
+const (
+	FlowStatusCanceled = "canceled"
+)

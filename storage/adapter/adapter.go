@@ -75,6 +75,8 @@ type Adapter interface {
 
 	//UpdateEventStatus updates the status of the specified event
 	UpdateEventStatus(ctx context.Context, eventId string, status string) error
+
+	UpdateFlowStatus(ctx context.Context, status string, flowId string) error
 }
 
 func RegisterAdapter(name FrameworkName, adapter Adapter) error {
