@@ -747,3 +747,17 @@ func ExecuteEventFlow(ctx context.Context, flowId string) error {
 	}
 	return nil
 }
+
+func Cancel(ctx context.Context, flowId string) error {
+	modelEventFlowInstance, err := adapter.RetrieveEventFlowInstance(ctx, flowId)
+	if err != nil {
+		return err
+	}
+	instance := &EventFlowInstance{}
+	eventFlowInstance := instance.NewFromModel(modelEventFlowInstance)
+	return eventFlowInstance.UpdateStatus(ctx, FlowStatusCanceled)
+}
+
+func Rollback(ctx context.Context, flowId string, eventName string) error {
+	return nil
+}
