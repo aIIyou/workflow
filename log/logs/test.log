@@ -1,0 +1,3 @@
+time="2026-05-05 11:26:35.051" level=info msg="这条日志应该写入文件" eventId=event-012 flowId=file-flow-789
+time="2026-05-05 11:27:06.063" level=info msg="这条日志应该写入文件" eventId=event-012 flowId=file-flow-789
+time="2026-05-05 11:27:30.150" level=info msg="这条日志应该写入文件" eventId=event-012 flowId=file-flow-789
