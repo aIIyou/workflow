@@ -210,7 +210,7 @@ func (gfa *GfAdapter) RetrieveExpiredEvent(ctx context.Context) (*model.Event, e
 		return nil, err
 	}
 
-	pendingEvent.Status = "processing"
+	pendingEvent.Status = "expired"
 
 	return pendingEvent, nil
 }
