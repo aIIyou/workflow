@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/aIIyou/workflow/config"
+	"github.com/aIIyou/workflow/consts"
 	"github.com/aIIyou/workflow/event"
 	"github.com/aIIyou/workflow/model"
 	"github.com/aIIyou/workflow/storage/adapter"
@@ -759,5 +760,31 @@ func Cancel(ctx context.Context, flowId string) error {
 }
 
 func Rollback(ctx context.Context, flowId string, eventName string) error {
+	return nil
+}
+
+func RetentMilestone(ctx context.Context, milestone string, f func(context.Context) error) error {
+	data := ctx.Value(consts.KeyData)
+	flowData, ok := data.(map[string]any)
+	if !ok {
+		return fmt.Errorf(``)
+	}
+	eventId := flowData[consts.KeyEventId].(string)
+	eventName := flowData[consts.KeyEventName].(string)
+
+	eventRetention, err := adapter.RetrieveEventMilestone(ctx, eventId, milestone)
+	if err != nil {
+		return fmt.Errorf(``)
+	}
+	if eventRetention != nil {
+		return nil
+	}
+	if err = adapter.CreateEventMilestone(ctx, eventId, eventName, milestone); err != nil {
+		return err
+	}
+
+	if err = f(ctx); err != nil {
+		return err
+	}
 	return nil
 }

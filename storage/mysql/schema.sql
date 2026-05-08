@@ -46,6 +46,18 @@ CREATE TABLE `event_queue` (
 -- No native definition for element: idx_flow_id (index)
 
 
+CREATE TABLE `event_retention` (
+                                   `id` bigint NOT NULL AUTO_INCREMENT,
+                                   `event_id` varchar(255) NOT NULL,
+                                   `event_name` varchar(255) NOT NULL,
+                                   `milestone` varchar(255) NOT NULL,
+                                   `create_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP /*!80023 INVISIBLE */,
+                                   `update_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                                   PRIMARY KEY (`id`),
+                                   UNIQUE KEY `idx_event_id_milestone` (`event_id`,`milestone`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
 
 
 

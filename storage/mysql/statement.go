@@ -26,14 +26,8 @@ const (
 	UpdateEventVisibleAt = "UPDATE `event_queue` SET `visible_at` = ? WHERE `event_id` = ?"
 
 	UpdateFlowStatus = "UPDATE `event_flow` SET `status` = ? WHERE `flow_id` = ?"
-)
 
-const (
-	create_flow_table = `
-CREATE TABLE work_flow(
-    flow_id varchar(256),
-    flow_type varchar(256),
-    flow_name varchar(256),
-    current_event varchar(256)
-)`
+	RetrieveEventMilestone = "SELECT * FROM `event_retention` WHERE `event_id` = ? AND `milestone` = ?"
+
+	CreateEventMilestone = "INSERT INTO `event_retention`(`event_id`, `event_name`, `milestone`) VALUES(?, ?, ?)"
 )

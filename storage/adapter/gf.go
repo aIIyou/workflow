@@ -335,3 +335,98 @@ func (gfa *GfAdapter) UpdateFlowStatus(ctx context.Context, status string, flowI
 	}
 	return nil
 }
+
+func (gfa *GfAdapter) RetrieveEventMilestone(ctx context.Context, eventId, milestone string) (*model.EventRetention, error) {
+	localTx := false
+
+	// retrieve transaction manager from ctx
+	// assuming user start a database transaction already
+	// if not, start it locally
+	tx := gdb.TXFromCtx(ctx, gfa.group)
+
+	// user has not started a transaction
+	var err error
+	if tx == nil {
+		localTx = true
+		tx, err = g.DB(gfa.group).Begin(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	result, err := tx.Query(mysql.RetrieveEventMilestone, eventId, milestone)
+	if err != nil {
+		// if start transaction locally,must commit or rollback
+		if localTx {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				return nil, fmt.Errorf("retrieve event_retention failed: %w; rollback also failed: %v", err, rollbackErr)
+			}
+			return nil, fmt.Errorf("retrieve event_retention failed: %v", err)
+		}
+		return nil, fmt.Errorf("retrieve event_retention failed: %v", err)
+	}
+
+	if result.Len() <= 0 {
+		return nil, nil
+	}
+
+	eventRetentions := make([]*model.EventRetention, 0)
+	err = result.Structs(&eventRetentions)
+	if err != nil {
+		// if start transaction locally,must commit or rollback
+		if localTx {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				return nil, fmt.Errorf("failed to parse event retention: %w; rollback also failed: %v", err, rollbackErr)
+			}
+			return nil, fmt.Errorf("failed to parse event retention: %v", err)
+		}
+		return nil, fmt.Errorf("failed to parse event retention: %v", err)
+	}
+	// if start transaction locally,must commit or rollback
+	if localTx {
+		if commitErr := tx.Commit(); commitErr != nil {
+			return nil, fmt.Errorf("commit failed: %v", commitErr)
+		}
+	}
+	return eventRetentions[0], nil
+}
+
+func (gfa *GfAdapter) CreateEventMilestone(ctx context.Context, eventId, eventName, milestone string) error {
+	// whether to commit or rollback transaction locally
+	localTx := false
+
+	// retrieve transaction manager from ctx
+	// assuming user start a database transaction already
+	// if not, start it locally
+	tx := gdb.TXFromCtx(ctx, gfa.group)
+
+	// user has not started a transaction
+	var err error
+	if tx == nil {
+		localTx = true
+		tx, err = g.DB(gfa.group).Begin(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	// insert milestone into table `event_retention`
+	_, err = tx.Exec(mysql.CreateEventMilestone, eventId, eventName, milestone)
+	if err != nil {
+		// if start transaction locally,must commit or rollback
+		if localTx {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				return fmt.Errorf("insert event_retention failed: %w; rollback also failed: %v", err, rollbackErr)
+			}
+			return fmt.Errorf("insert event_retention failed: %v", err)
+		}
+		return fmt.Errorf("insert event_retention failed: %v", err)
+	}
+
+	// if start transaction locally,must commit or rollback
+	if localTx {
+		if commitErr := tx.Commit(); commitErr != nil {
+			return fmt.Errorf("commit failed: %v", commitErr)
+		}
+	}
+	return nil
+}

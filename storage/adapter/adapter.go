@@ -77,6 +77,10 @@ type Adapter interface {
 	UpdateEventStatus(ctx context.Context, eventId string, status string) error
 
 	UpdateFlowStatus(ctx context.Context, status string, flowId string) error
+
+	RetrieveEventMilestone(ctx context.Context, eventId, milestone string) (*model.EventRetention, error)
+
+	CreateEventMilestone(ctx context.Context, eventId, eventName, milestone string) error
 }
 
 func RegisterAdapter(name FrameworkName, adapter Adapter) error {
@@ -192,4 +196,22 @@ func UpdateEventStatus(ctx context.Context, eventId string, status string) error
 		return err
 	}
 	return adapter.UpdateEventStatus(ctx, eventId, status)
+}
+
+func RetrieveEventMilestone(ctx context.Context, eventId, milestone string) (*model.EventRetention, error) {
+	adapter, err := RetrieveAdapter(framework)
+	if err != nil {
+		return nil, err
+	}
+	return adapter.RetrieveEventMilestone(ctx, eventId, milestone)
+}
+
+func CreateEventMilestone(ctx context.Context, eventId, eventName, milestone string) error {
+
+	adapter, err := RetrieveAdapter(framework)
+	if err != nil {
+		return err
+	}
+	return adapter.CreateEventMilestone(ctx, eventId, eventName, milestone)
+
 }
