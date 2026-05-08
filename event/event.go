@@ -175,7 +175,3 @@ var GlobalEndEvent = &EndEvent{
 		},
 	},
 }
-
-func LoadEvent(eventId string) (*Event, error) {
-	return nil, nil
-}
