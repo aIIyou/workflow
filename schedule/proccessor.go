@@ -59,6 +59,14 @@ func (p *defaultProcessor) reportHeartBeat(ctx context.Context, e *event.Event) 
 	return adapter.UpdateEventHeartbeat(ctx, e.EventId)
 }
 
+func (p *defaultProcessor) addContextData(ctx context.Context, data map[string]any, e *event.Event) {
+
+	data[flow.KeyFlowId] = e.FlowId
+	data[flow.KeyFlowName] = e.FlowName
+	data[flow.KeyEventId] = e.EventId
+	data[flow.KeyEventName] = e.Name
+}
+
 func (p *defaultProcessor) executeUserMethod(ctx context.Context, e *event.Event) error {
 	flowId := e.FlowId
 	flowName := e.FlowName
@@ -98,7 +106,7 @@ func (p *defaultProcessor) executeUserMethod(ctx context.Context, e *event.Event
 	if flowData == nil {
 		flowData = make(map[string]any)
 	}
-	flowData[flow.KeyFlowId] = flowId
+	p.addContextData(ctx, flowData, e)
 	ctx = context.WithValue(ctx, flow.KeyData, flowData)
 
 	// 调用方法，传入context参数
